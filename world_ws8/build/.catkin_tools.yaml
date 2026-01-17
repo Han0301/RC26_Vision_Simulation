@@ -1,6 +1,0 @@
-devel_space: /home/h/RC2026/world_ws8/devel
-install: false
-install_space: /home/h/RC2026/world_ws8/install
-profile: default
-source_space: /home/h/RC2026/world_ws8/src
-workspace: /home/h/RC2026/world_ws8

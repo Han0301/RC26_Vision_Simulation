@@ -1,1 +1,0 @@
-/home/h/RC2026/world_ws8/devel/.private/zwei/share/zwei/cmake/zweiConfig-version.cmake

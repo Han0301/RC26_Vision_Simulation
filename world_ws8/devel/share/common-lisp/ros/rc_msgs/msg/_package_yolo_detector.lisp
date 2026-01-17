@@ -1,1 +1,0 @@
-/home/h/RC2026/world_ws8/devel/.private/rc_msgs/share/common-lisp/ros/rc_msgs/msg/_package_yolo_detector.lisp

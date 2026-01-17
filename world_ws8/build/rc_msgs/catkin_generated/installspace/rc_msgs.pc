@@ -1,8 +1,0 @@
-prefix=/home/h/RC2026/world_ws8/install
-
-Name: rc_msgs
-Description: Description of rc_msgs
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: roscpp rospy std_msgs geometry_msgs vision_msgs message_runtime

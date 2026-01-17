@@ -1,1 +1,0 @@
-/home/h/RC2026/world_ws8/devel/.private/rc_msgs/lib/python3/dist-packages/rc_msgs/msg/_serial.py

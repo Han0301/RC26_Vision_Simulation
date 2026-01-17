@@ -1,4 +1,0 @@
-zwei
-/home/h/RC2026/world_ws8/devel/.private/zwei/share/zwei/cmake/zweiConfig.cmake /home/h/RC2026/world_ws8/devel/share/zwei/cmake/zweiConfig.cmake
-/home/h/RC2026/world_ws8/devel/.private/zwei/share/zwei/cmake/zweiConfig-version.cmake /home/h/RC2026/world_ws8/devel/share/zwei/cmake/zweiConfig-version.cmake
-/home/h/RC2026/world_ws8/devel/.private/zwei/lib/pkgconfig/zwei.pc /home/h/RC2026/world_ws8/devel/lib/pkgconfig/zwei.pc

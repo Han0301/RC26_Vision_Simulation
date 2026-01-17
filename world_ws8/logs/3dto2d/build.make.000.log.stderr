@@ -1,9 +1,0 @@
-In file included from [01m[K/home/h/RC2026/world_ws8/src/3dto2d/src/package/debug_hsv.cpp:4[m[K:
-[01m[K/home/h/RC2026/world_ws8/src/3dto2d/src/package/debug_hsv.h:29:10:[m[K [01;31m[Kfatal error: [m[Kzbuffer_simplify.h: 没有那个文件或目录
-   29 | #include [01;31m[K"zbuffer_simplify.h"[m[K
-      |          [01;31m[K^~~~~~~~~~~~~~~~~~~~[m[K
-compilation terminated.
-make[2]: *** [CMakeFiles/3dto2d_ten_utils.dir/build.make:102：CMakeFiles/3dto2d_ten_utils.dir/src/package/debug_hsv.cpp.o] 错误 1
-make[2]: *** 正在等待未完成的任务....
-make[1]: *** [CMakeFiles/Makefile2:225：CMakeFiles/3dto2d_ten_utils.dir/all] 错误 2
-make: *** [Makefile:141：all] 错误 2
