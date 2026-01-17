@@ -1,0 +1,7 @@
+path: D:\\A_myData\\dataset\\corner2
+
+train: train\\images
+val: val\\images
+
+names:
+  0: 1
