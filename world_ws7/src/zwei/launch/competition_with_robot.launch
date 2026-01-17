@@ -1,0 +1,44 @@
+<launch>
+  <!-- 环境启动部分 -->
+  <!-- 加载场地URDF到参数服务器 -->
+  <param name="arena_description" 
+         command="$(find xacro)/xacro '$(find zwei)/urdf/zwei.urdf'"/>
+  
+  <!-- 启动Gazebo服务 -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find zwei)/worlds/competition.world"/>
+    <arg name="paused" value="false"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="gui" value="true"/>
+    <arg name="headless" value="false"/>
+    <arg name="debug" value="false"/>
+    <!-- 添加verbose参数以查看更多信息 -->
+    <arg name="verbose" value="true"/>
+  </include>
+  
+  <!-- 在Gazebo中生成场地模型 -->
+  <node name="spawn_arena" pkg="gazebo_ros" type="spawn_model"
+        args="-urdf -param arena_description -model competition_area -x 0 -y 0 -z 0"
+        respawn="false" output="screen"/>
+
+  <!-- 机器人启动部分 -->
+  <!-- 加载机器人模型描述参数 -->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find mbot_description)/urdf/mbot.xacro'" /> 
+
+  <!-- 运行joint_state_publisher节点 -->
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node> 
+
+  <!-- 运行robot_state_publisher节点 -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"  output="screen" >
+    <param name="publish_frequency" type="double" value="50.0" />
+  </node>
+
+  <!-- 在gazebo中加载机器人模型 -->
+  <!-- 设置机器人初始位置，避免与环境碰撞 -->
+  <node name="spawn_robot" pkg="gazebo_ros" type="spawn_model" 
+        args="-urdf -param robot_description -model mbot -x 0.8 -y 1.5 -z 0.2 -Y 1.57"
+        respawn="false" output="screen"/>
+  
+  <!-- 可选：启动RViz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find area)/config/competition.rviz"/>
+</launch>
