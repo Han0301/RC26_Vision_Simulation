@@ -1,0 +1,58 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_f02ac/fast && /usr/bin/make -f CMakeFiles/cmTC_f02ac.dir/build.make CMakeFiles/cmTC_f02ac.dir/build
+make[1]: 进入目录“/home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp”
+Building C object CMakeFiles/cmTC_f02ac.dir/src.c.o
+/usr/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_f02ac.dir/src.c.o   -c /home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_f02ac
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f02ac.dir/link.txt --verbose=1
+/usr/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD    -rdynamic CMakeFiles/cmTC_f02ac.dir/src.c.o  -o cmTC_f02ac 
+/usr/bin/ld: CMakeFiles/cmTC_f02ac.dir/src.c.o: in function `main':
+src.c:(.text+0x46): undefined reference to `pthread_create'
+/usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
+/usr/bin/ld: src.c:(.text+0x63): undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_f02ac.dir/build.make:87：cmTC_f02ac] 错误 1
+make[1]: 离开目录“/home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp”
+make: *** [Makefile:121：cmTC_f02ac/fast] 错误 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_bf783/fast && /usr/bin/make -f CMakeFiles/cmTC_bf783.dir/build.make CMakeFiles/cmTC_bf783.dir/build
+make[1]: 进入目录“/home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp”
+Building C object CMakeFiles/cmTC_bf783.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_bf783.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_bf783
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bf783.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create    -rdynamic CMakeFiles/cmTC_bf783.dir/CheckFunctionExists.c.o  -o cmTC_bf783  -lpthreads 
+/usr/bin/ld: 找不到 -lpthreads
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_bf783.dir/build.make:87：cmTC_bf783] 错误 1
+make[1]: 离开目录“/home/h/RC2026/world_ws8/build/3dto2d/CMakeFiles/CMakeTmp”
+make: *** [Makefile:121：cmTC_bf783/fast] 错误 2
+
+
+

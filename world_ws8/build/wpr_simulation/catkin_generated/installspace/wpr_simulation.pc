@@ -1,0 +1,8 @@
+prefix=/home/h/RC2026/world_ws8/install
+
+Name: wpr_simulation
+Description: Description of wpr_simulation
+Version: 0.0.4
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

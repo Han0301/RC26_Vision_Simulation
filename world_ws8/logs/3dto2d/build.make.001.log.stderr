@@ -1,0 +1,3 @@
+make[2]: *** 没有规则可制作目标“/home/h/RC2026/world_ws8/src/3dto2d/src/package/debug_hsv.cpp”，由“CMakeFiles/3dto2d_ten_utils.dir/src/package/debug_hsv.cpp.o” 需求。 停止。
+make[1]: *** [CMakeFiles/Makefile2:225：CMakeFiles/3dto2d_ten_utils.dir/all] 错误 2
+make: *** [Makefile:141：all] 错误 2

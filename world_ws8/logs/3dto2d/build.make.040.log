@@ -1,0 +1,6 @@
+[35m[1mScanning dependencies of target 3dto2d_ten_utils[0m
+[ 16%] [32mBuilding CXX object CMakeFiles/3dto2d_ten_utils.dir/src/package/occlusion_handing.cpp.o[0m
+[ 33%] [32m[1mLinking CXX shared library /home/h/RC2026/world_ws8/devel/.private/3dto2d/lib/lib3dto2d_ten_utils.so[0m
+[ 66%] Built target 3dto2d_ten_utils
+[ 83%] [32m[1mLinking CXX executable /home/h/RC2026/world_ws8/devel/.private/3dto2d/lib/3dto2d/zbuffer_func_node[0m
+[100%] Built target zbuffer_func_node

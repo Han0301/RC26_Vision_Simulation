@@ -1,0 +1,8 @@
+prefix=/home/h/RC2026/world_ws8/install
+
+Name: 3dto2d
+Description: Description of 3dto2d
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

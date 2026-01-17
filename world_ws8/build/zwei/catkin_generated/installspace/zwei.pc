@@ -1,0 +1,8 @@
+prefix=/home/h/RC2026/world_ws8/install
+
+Name: zwei
+Description: Description of zwei
+Version: 1.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

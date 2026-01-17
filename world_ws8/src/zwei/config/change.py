@@ -1,0 +1,1510 @@
+#!/usr/bin/env python3
+import argparse
+import random
+import os
+
+# 获取当前脚本所在目录（zwei/config）
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 计算zwei包的根目录
+ZWEI_ROOT = os.path.dirname(SCRIPT_DIR)
+# 设置URDF输出路径（zwei/urdf/area.urdf）
+URDF_OUTPUT_PATH = os.path.join(ZWEI_ROOT, "urdf", "area.urdf")
+
+# 方块类型定义
+EMPTY = 0
+R1 = 1
+R2 = 2
+FADE = 3
+
+# 基础URDF模板（包含link0到link24）
+BASE_URDF_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-1-g15f4949  Build Version: 1.6.7594.29634
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="zwei">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="6.025 7.59901863606395 0.159497471230316"
+        rpy="0 0 0" />
+      <mass
+        value="32830.9811175371" />
+      <inertia
+        ixx="41297.6713371606"
+        ixy="-2.50785933512626E-11"
+        ixz="-7.99909194612046E-13"
+        iyy="65334.3271755097"
+        iyz="-266.198195272754"
+        izz="105720.894307686" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <!--<geometry>
+        <mesh
+          filename="package://zwei/meshes/base_link.STL" />
+      </geometry>-->
+      <!--<material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <!--<geometry>
+        <mesh
+          filename="package://zwei/meshes/base_link.STL" />
+      </geometry>-->
+    </collision>
+  </link>
+  <link
+    name="Link1">
+    <inertial>
+      <origin
+        xyz="3.025 0.0899299276190646 2.1"
+        rpy="0 0 0" />
+      <mass
+        value="2300.00896" />
+      <inertia
+        ixx="283.290308175557"
+        ixy="6.85401140947789E-15"
+        ixz="1.6649606738741E-14"
+        iyy="551.233941162667"
+        iyz="3.39786615074972E-15"
+        izz="283.290308175557" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link1.STL" />
+      </geometry>
+      <!--<material
+        name="link1">
+        <color
+          rgba="0.16078431372549 0.32156862745098 0.0627450980392157 1" /> 
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink1"
+    type="fixed">
+    <origin
+      xyz="9.05 3.8 0.00980000000000023"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link2">
+    <inertial>
+      <origin
+        xyz="4.225 0.189929927619065 1.6"
+        rpy="0 0 0" />
+      <mass
+        value="6900.02688" />
+      <inertia
+        ixx="918.871193326671"
+        ixy="-1.58382749771503E-14"
+        ixz="-8.56900881089812E-15"
+        iyy="1653.701823488"
+        iyz="-3.38855738196597E-14"
+        izz="918.87119332667" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link2.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.164705882352941 0.443137254901961 0.219607843137255 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink2"
+    type="fixed">
+    <origin
+      xyz="10.25 3.8 0.00980000000000023"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link3">
+    <inertial>
+      <origin
+        xyz="1.825 0.289929927619065 0.6"
+        rpy="0 0 0" />
+      <mass
+        value="3450.01344" />
+      <inertia
+        ixx="516.935820663336"
+        ixy="1.79481572017276E-15"
+        ixz="4.28090451542323E-14"
+        iyy="826.850911744001"
+        iyz="-1.97300854240976E-14"
+        izz="516.935820663336" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link3.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.596078431372549 0.650980392156863 0.313725490196078 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink3"
+    type="fixed">
+    <origin
+      xyz="7.85 5 0.00980000000000031"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  
+  <link
+    name="Link4">
+    <inertial>
+      <origin
+        xyz="-2.71653146810334 0.210989959593486 0.0575670380800792"
+        rpy="0 0 0" />
+      <mass
+        value="6125.25" />
+      <inertia
+        ixx="3425.2331149175"
+        ixy="-57.0341020647116"
+        ixz="1249.75282895341"
+        iyy="19504.160145407"
+        iyz="-10.2293028728419"
+        izz="16291.1884747545" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link4.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.996078431372549 0.729411764705882 0.63921568627451 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink4"
+    type="fixed">
+    <origin
+      xyz="6.025 10.75 -0.0401999999999993"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link4" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  
+  <link
+    name="Link5">
+    <inertial>
+      <origin
+        xyz="2.71653146810334 0.210989959593486 0.0575670380800783"
+        rpy="0 0 0" />
+      <mass
+        value="6125.25" />
+      <inertia
+        ixx="3425.2331149175"
+        ixy="57.0341020647116"
+        ixz="-1249.75282895341"
+        iyy="19504.160145407"
+        iyz="-10.2293028728418"
+        izz="16291.1884747545" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link5.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.505882352941176 0.823529411764706 0.83921568627451 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink5"
+    type="fixed">
+    <origin
+      xyz="6.025 10.75 -0.0401999999999993"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link5" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link6">
+    <inertial>
+      <origin
+        xyz="-4.525 0.123333333333334 -1"
+        rpy="0 0 0" />
+      <mass
+        value="900" />
+      <inertia
+        ixx="120.5"
+        ixy="-3.21502084214368E-14"
+        ixz="-5.20417042793042E-15"
+        iyy="281.25"
+        iyz="15"
+        izz="176.75" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link6.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.752941176470588 0.741176470588235 0.713725490196078 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink6"
+    type="fixed">
+    <origin
+      xyz="10.55 9.3 0.00980000000000057"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link6" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link7">
+    <inertial>
+      <origin
+        xyz="-1.775 -0.00990000000000002 8.88178419700125E-16"
+        rpy="0 0 0" />
+      <mass
+        value="0.17999999999998" />
+      <inertia
+        ixx="0.00135000059999985"
+        ixy="-1.37753244236987E-37"
+        ixz="7.73252989416785E-19"
+        iyy="0.0350999999999961"
+        iyz="-8.27180612553027E-23"
+        izz="0.0337500005999963" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link7.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="1 1 0 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink7"
+    type="fixed">
+    <origin
+      xyz="4.25 9.65 0.409800000000001"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link7" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link8">
+    <inertial>
+      <origin
+        xyz="-2.04979445341204E-14 0.0499999999999999 0.137990936555892"
+        rpy="0 0 0" />
+      <mass
+        value="49.6499999999993" />
+      <inertia
+        ixx="0.247721073498422"
+        ixy="4.37682485740497E-15"
+        ixz="1.48671816970222E-14"
+        iyy="309.047939823494"
+        iyz="-3.24120087816394E-17"
+        izz="308.882968749995" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link8.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.392156862745098 0.243137254901961 0 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link8.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink8"
+    type="fixed">
+    <origin
+      xyz="6.025 9.45 0.399800000000001"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link8" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link9">
+    <inertial>
+      <origin
+        xyz="0.993939393939435 -0.258384848484859 -6.85757575757604"
+        rpy="0 0 0" />
+      <mass
+        value="0.527999999999978" />
+      <inertia
+        ixx="0.0401600017599982"
+        ixy="1.76465197344646E-22"
+        ixz="-2.56068314700523E-19"
+        iyy="0.0803199999999963"
+        iyz="8.82325986723231E-23"
+        izz="0.0401600017599982" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link9.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.874509803921569 0.133333333333333 0.133333333333333 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link9.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink9"
+    type="fixed">
+    <origin
+      xyz="11.55 11.5 0.409800000000001"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link9" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link10">
+    <inertial>
+      <origin
+        xyz="-0.993939393939436 -0.258384848484859 -6.85757575757605"
+        rpy="0 0 0" />
+      <mass
+        value="0.527999999999978" />
+      <inertia
+        ixx="0.0401600017599982"
+        ixy="8.8232598672323E-23"
+        ixz="5.26662047306559E-20"
+        iyy="0.0803199999999964"
+        iyz="4.59177480789956E-38"
+        izz="0.0401600017599982" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link10.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.196078431372549 0 1 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link10.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink10"
+    type="fixed">
+    <origin
+      xyz="0.500000000000001 11.5 0.409800000000001"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link10" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link11">
+    <inertial>
+      <origin
+        xyz="1.77635683940025E-15 -0.00999999999999956 0.00499999999999989"
+        rpy="0 0 0" />
+      <mass
+        value="55.9999999999988" />
+      <inertia
+        ixx="2.28713333333328"
+        ixy="0"
+        ixz="-3.34223389704858E-17"
+        iyy="298.667133333327"
+        iyz="1.65955212535108E-18"
+        izz="300.953333333327" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link11.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="1 1 1 0.35" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link11.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink11"
+    type="fixed">
+    <origin
+      xyz="6.025 9.44 0.4598"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link11" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link12">
+    <inertial>
+      <origin
+        xyz="4.44089209850063E-16 0.015 0"
+        rpy="0 0 0" />
+      <mass
+        value="622.6875" />
+      <inertia
+        ixx="218.200078125"
+        ixy="-2.24820162486594E-16"
+        ixz="2.67756708009307E-14"
+        iyy="2133.12629882812"
+        iyz="0"
+        izz="1915.18567382812" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link12.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.980392156862745 0.862745098039216 0.854901960784314 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link12.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink12"
+    type="fixed">
+    <origin
+      xyz="9.0625 0.975000000000001 -0.0401999999999999"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link12" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link13">
+    <inertial>
+      <origin
+        xyz="-4.44089209850063E-16 0.015 0"
+        rpy="0 0 0" />
+      <mass
+        value="622.6875" />
+      <inertia
+        ixx="218.200078125"
+        ixy="2.24820162486594E-16"
+        ixz="5.31179787655045E-14"
+        iyy="2133.12629882812"
+        iyz="0"
+        izz="1915.18567382812" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link13.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.501960784313725 0.780392156862745 0.886274509803922 1" />
+      </material>-->
+
+
+
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link13.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink13"
+    type="fixed">
+    <origin
+      xyz="2.9875 0.975000000000001 -0.0401999999999999"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link13" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link14">
+    <inertial>
+      <origin
+        xyz="-7.52870263235695E-16 0.240006966611985 -8.88178419700125E-16"
+        rpy="0 0 0" />
+      <mass
+        value="180.004750088092" />
+      <inertia
+        ixx="25.3508855513742"
+        ixy="-3.23378061454737E-17"
+        ixz="1.29896093881143E-15"
+        iyy="22.9505541983194"
+        iyz="4.82429167933145E-16"
+        izz="5.10033137443016" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link14.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.607843137254902 0.372549019607843 0 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link14.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink14"
+    type="fixed">
+    <origin
+      xyz="6.025 0.950000000000001 0.00980000000000006"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link14" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link15">
+    <inertial>
+      <origin
+        xyz="3.425 0.139757217556369 0.0344546158415753"
+        rpy="0 0 0" />
+      <mass
+        value="8.45683075417978" />
+      <inertia
+        ixx="0.239478557028983"
+        ixy="5.93163905713724E-16"
+        ixz="7.25348463254944E-17"
+        iyy="0.929187431006892"
+        iyz="0.00987857660056836"
+        izz="1.11192107249195" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link15.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.607843137254902 0.372549019607843 0 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link15.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink15"
+    type="fixed">
+    <origin
+      xyz="9.45 0.16 0.01"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link15" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link16">
+    <inertial>
+      <origin
+        xyz="1.33226762955019E-15 0.015 -1.0547118733939E-15"
+        rpy="0 0 0" />
+      <mass
+        value="2262.9375" />
+      <inertia
+        ixx="10467.028828125"
+        ixy="8.99280649946375E-16"
+        ixz="2.92266211232572E-13"
+        iyy="17426.1509472656"
+        iyz="0"
+        izz="6960.06500976563" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link16.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.925490196078431 0.635294117647059 0.592156862745098 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link16.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink16"
+    type="fixed">
+    <origin
+      xyz="9.0625 5.725 -0.0401999999999996"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link16" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link17">
+    <inertial>
+      <origin
+        xyz="1.33226762955019E-15 0.015 -1.0547118733939E-15"
+        rpy="0 0 0" />
+      <mass
+        value="2262.9375" />
+      <inertia
+        ixx="10467.028828125"
+        ixy="8.99280649946375E-16"
+        ixz="2.92266211232572E-13"
+        iyy="17426.1509472656"
+        iyz="0"
+        izz="6960.06500976563" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link17.STL" />
+      </geometry>
+      <!--<material
+        name="">
+        <color
+          rgba="0.501960784313725 0.749019607843137 0.819607843137255 1" />
+      </material>-->
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link17.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink17"
+    type="fixed">
+    <origin
+      xyz="2.9875 5.725 -0.0401999999999996"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link17" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="Link18">
+    <inertial>
+      <origin
+        xyz="1.66558594613715E-14 -0.0099 1.67934782608699"
+        rpy="0 0 0" />
+      <mass
+        value="0.13248" />
+      <inertia
+        ixx="0.0142290930130287"
+        ixy="2.68703049839647E-21"
+        ixz="-4.33116103491781E-16"
+        iyy="0.323723828571425"
+        iyz="2.76801097191775E-22"
+        izz="0.309494736441596" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link18.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link18.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ink18"
+    type="fixed">
+    <origin
+      xyz="6.025 1.97 0.00980000000000012"
+      rpy="1.5707963267949 0 3.14159265358979" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link18" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+
+  
+  <link
+    name="Link24">
+    <inertial>
+      <origin
+        xyz="-2.97463700687495E-15 -0.365000000000022 0.539999999999988"
+        rpy="0 0 0" />
+      <mass
+        value="385.875" />
+      <inertia
+        ixx="7.87828124999999"
+        ixy="-1.9249671715797E-16"
+        ixz="-4.24422845154635E-16"
+        iyy="7.87828124999999"
+        iyz="3.21162092559111E-16"
+        izz="7.87828125" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/tictoc.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://zwei/meshes/Link24.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="end"
+    type="fixed">
+    <origin
+      xyz="6.025 10.21 1.1698"
+      rpy="-1.5707963267949 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link24" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <!-- 以下是自动生成的方块部分 -->
+  {blocks_content}
+</robot>
+"""
+
+# 每个格子对应的完整URDF模板（只替换视觉模型）
+GRID_TEMPLATES = [
+    # 格子1 (link25)
+    """<link name="Link25">
+    <inertial>
+      <origin xyz="0 0.165 0" rpy="0 0 0"/>
+      <mass value="42.8749999999999"/>
+      <inertia ixx="0.875364583333331" ixy="2.08253553291014E-17" ixz="2.08253553291015E-17" iyy="0.87536458333333" iyz="3.98899663300867E-17" izz="0.87536458333333"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link25.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="25" type="fixed">
+    <origin xyz="1.8 3.8 0.4098" rpy="1.5707963267949 0 0"/>
+    <parent link="base_link"/>
+    <child link="Link25"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子2 (link26)
+    """<link name="Link26">
+    <inertial>
+      <origin xyz="0 0.165 -4.44089209850063E-16" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333331" ixy="5.86914776038772E-19" ixz="-2.01311768181315E-16" iyy="0.875364583333331" iyz="-5.86914776038792E-19" izz="0.875364583333332"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link26.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="26" type="fixed">
+    <origin xyz="3 3.8 0.2098" rpy="1.5707963267949 0 0"/>
+    <parent link="base_link"/>
+    <child link="Link26"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子3 (link27)
+    """<link name="Link27">
+    <inertial>
+      <origin xyz="0 0.175 0" rpy="0 0 0"/>
+      <mass value="42.8749999999999"/>
+      <inertia ixx="0.875364583333331" ixy="4.60222138176646E-17" ixz="4.61436444609835E-18" iyy="0.875364583333331" iyz="-5.86914776038796E-19" izz="0.875364583333331"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link27.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="27" type="fixed">
+    <origin xyz="4.2 3.8 0.399800000000001" rpy="1.5707963267949 0 0"/>
+    <parent link="base_link"/>
+    <child link="Link27"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子4 (link28)
+    """<link name="Link28">
+    <inertial>
+      <origin xyz="0 0.165 0" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333332" ixy="3.15517288222248E-17" ixz="4.33305012241074E-17" iyy="0.875364583333333" iyz="-3.52958403245416E-17" izz="0.875364583333332"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link28.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="28" type="fixed">
+    <origin xyz="1.635 5 0.3748" rpy="1.5707963267949 1.5707963267949 0"/>
+    <parent link="base_link"/>
+    <child link="Link28"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子5 (link29)
+    """<link name="Link29">
+    <inertial>
+      <origin xyz="1.11022302462516E-16 0.165 1.11022302462516E-16" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="1.81208838190243E-18" ixz="8.00444944262377E-17" iyy="0.875364583333333" iyz="2.01902317758063E-16" izz="0.875364583333334"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link29.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="29" type="fixed">
+    <origin xyz="3.165 5 0.5748" rpy="1.5707963267949 -1.5707963267949 0"/>
+    <parent link="base_link"/>
+    <child link="Link29"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子6 (link30)
+    """<link name="Link30">
+    <inertial>
+      <origin xyz="1.11022302462516E-16 0.175 1.11022302462516E-16" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="2.99435207506599E-17" ixz="-3.62374896154395E-17" iyy="0.875364583333333" iyz="8.96032588172275E-17" izz="0.875364583333332"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link30.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="30" type="fixed">
+    <origin xyz="4.025 5 0.7748" rpy="1.5707963267949 1.5707963267949 0"/>
+    <parent link="base_link"/>
+    <child link="Link30"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子7 (link31)
+    """<link name="Link31">
+    <inertial>
+      <origin xyz="0 0.165 8.32667268468867E-17" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333332" ixy="5.86914776038744E-19" ixz="2.17968004756486E-17" iyy="0.875364583333331" iyz="-5.86914776038851E-19" izz="0.875364583333331"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link31.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="31" type="fixed">
+    <origin xyz="1.8 6.2 0.7398" rpy="-1.5707963267949 0 3.14159265358979"/>
+    <parent link="base_link"/>
+    <child link="Link31"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子8 (link32)
+    """<link name="Link32">
+    <inertial>
+      <origin xyz="-4.44089209850063E-16 0.175 1.11022302462516E-16" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="-2.46099437125244E-17" ixz="-1.23616394898107E-16" iyy="0.875364583333333" iyz="8.03668474362121E-17" izz="0.875364583333333"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link32.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="32" type="fixed">
+    <origin xyz="3 6.2 0.9498" rpy="-1.5707963267949 0 3.14159265358979"/>
+    <parent link="base_link"/>
+    <child link="Link32"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子9 (link33)
+    """<link name="Link33">
+    <inertial>
+      <origin xyz="0 0.175 8.32667268468867E-17" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="7.6323204737287E-18" ixz="2.35643952628183E-18" iyy="0.875364583333333" iyz="3.6920519972462E-17" izz="0.875364583333333"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link33.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="33" type="fixed">
+    <origin xyz="4.375 6.2 0.5748" rpy="1.5707963267949 -1.5707963267949 0"/>
+    <parent link="base_link"/>
+    <child link="Link33"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子10 (link34)
+    """<link name="Link34">
+    <inertial>
+      <origin xyz="0 0.175 0" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333332" ixy="-1.46931078415236E-17" ixz="1.38349979620737E-16" iyy="0.875364583333331" iyz="1.9651525777024E-17" izz="0.875364583333331"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link34.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="34" type="fixed">
+    <origin xyz="1.8 7.4 0.199800000000001" rpy="1.5707963267949 0 0"/>
+    <parent link="base_link"/>
+    <child link="Link34"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子11 (link35)
+    """<link name="Link35">
+    <inertial>
+      <origin xyz="-1.11022302462516E-16 0.175 0" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="1.18052701877353E-16" ixz="-3.83989045164059E-17" iyy="0.875364583333333" iyz="-7.15730675387921E-17" izz="0.875364583333334"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link35.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="35" type="fixed">
+    <origin xyz="2.825 7.4 0.5748" rpy="1.5707963267949 1.5707963267949 0"/>
+    <parent link="base_link"/>
+    <child link="Link35"/>
+    <axis xyz="0 0 0"/>
+  </joint>""",
+    
+    # 格子12 (link36)
+    """<link name="Link36">
+    <inertial>
+      <origin xyz="0 0.175 0" rpy="0 0 0"/>
+      <mass value="42.875"/>
+      <inertia ixx="0.875364583333333" ixy="-8.03668474362122E-17" ixz="-6.2354635343986E-17" iyy="0.875364583333334" iyz="1.96515257770239E-17" izz="0.875364583333334"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/{visual_mesh}.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://zwei/meshes/Link36.STL"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="36" type="fixed">
+    <origin xyz="4.2 7.4 0.549800000000001" rpy="-1.5707963267949 0 3.14159265358979"/>
+    <parent link="base_link"/>
+    <child link="Link36"/>
+    <axis xyz="0 0 0"/>
+  </joint>"""
+]
+
+
+def get_visual_mesh(grid_idx, block_type):
+    """根据位置和方块类型返回视觉模型文件名"""
+    # 位置编号（1-12）
+    position = grid_idx + 1
+    
+    # 生成三位数的视觉模型文件名
+    # 格式：位置编号（两位数）+ 方块类型（一位数）
+    return f"{position:02d}{block_type}"
+
+def generate_configuration(seed=None):
+    """生成随机方块配置（12个格子）"""
+    if seed is not None:
+        random.seed(seed)
+    
+    # 创建12个格子的配置 (0=空, 1=R1, 2=R2, 3=FADE)
+    return [random.randint(0, 3) for _ in range(12)]
+
+def generate_urdf(configuration):
+    """根据配置生成URDF文件"""
+    blocks_urdf = []
+    
+    for grid_idx, block_type in enumerate(configuration):
+        if block_type == EMPTY:
+            continue  # 跳过空格子
+        
+        # 获取视觉模型
+        visual_mesh = get_visual_mesh(grid_idx, block_type)
+        
+        # 使用完整模板，只替换视觉模型
+        block_urdf = GRID_TEMPLATES[grid_idx].format(visual_mesh=visual_mesh)
+        blocks_urdf.append(block_urdf)
+    
+    # 组合完整URDF
+    full_urdf = BASE_URDF_TEMPLATE.format(
+        base_links=BASE_LINKS_CONTENT,
+        blocks_content="\n".join(blocks_urdf)
+    )
+    
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(URDF_OUTPUT_PATH), exist_ok=True)
+    
+    # 写入文件
+    with open(URDF_OUTPUT_PATH, 'w') as f:
+        f.write(full_urdf)
+    print(f"Generated URDF saved to {URDF_OUTPUT_PATH}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate URDF for Gazebo simulation')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed')
+    args = parser.parse_args()
+    
+    # 生成随机配置
+    config = generate_configuration(args.seed)
+    print("Generated configuration:")
+    print(config)
+    
+    # 生成URDF文件
+    generate_urdf(config)
+    
+    # 提示启动命令
+    print("\nTo launch Gazebo simulation:")
+    print(f"roslaunch gazebo_ros empty_world.launch world_name:={URDF_OUTPUT_PATH}")
