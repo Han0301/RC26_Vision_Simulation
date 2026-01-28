@@ -28,8 +28,8 @@ void Ten_occlusion_handing::set_box_lists_(
 
     // 3. 填充 zbuffer 矩阵
     // 3.1 初始化深度缓冲（初始值为最大浮点数，表示无深度）
-    static cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
-    static cv::Mat object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+    cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+    cv::Mat object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
 
     // 3.2 检查surface_2d_point 2d点 合理性
     if (!(object_2d.size() == 36 && plum_2d.size() == 36)){
@@ -50,7 +50,7 @@ void Ten_occlusion_handing::set_box_lists_(
         bool all_outside = set_all_outside(p_front,p_side,p_up,image.cols,image.rows,all_points);
         if (all_outside) continue; 
         // 3.3.2 构建台阶轮廓, 填充台阶深度到临时矩阵 plum_tmp
-        static cv::Mat plum_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+        cv::Mat plum_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
         set_temp(p_front,p_side,p_up,plum_temp);
         // 3.3.3 计算台阶像素范围
         float plum_x_min = FLT_MAX,plum_y_min = FLT_MAX,plum_x_max = FLT_MIN,plum_y_max = FLT_MIN;
@@ -68,6 +68,9 @@ void Ten_occlusion_handing::set_box_lists_(
     // 3.4 再填充方块的深度, 4 在循环中填充各个方块的roi图像信息
     for(size_t i = 0; i < object_2d.size(); i+=3)
     {
+        // 3.4.0 重置 roi_valid_flag 状态
+        box_lists[i / 3].roi_valid_flag = 0;
+
         auto& o_front = object_2d[i];
         auto& o_side = object_2d[i + 1];
         auto& o_up = object_2d[i + 2];
@@ -77,7 +80,7 @@ void Ten_occlusion_handing::set_box_lists_(
         bool all_outside = set_all_outside(o_front,o_side,o_up,image.cols,image.rows,all_points);
         if (all_outside) continue; 
         // 3.4.2 构建方块轮廓, 填充方块深度到临时矩阵 object_temp
-        static cv::Mat object_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+        cv::Mat object_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
         set_temp(o_front,o_side,o_up,object_temp);
         // 3.4.3 计算方块像素范围
         float object_x_min = FLT_MAX,object_y_min = FLT_MAX,object_x_max = FLT_MIN,object_y_max = FLT_MIN;
@@ -109,14 +112,19 @@ void Ten_occlusion_handing::set_box_lists_(
             if(!is_valid) continue;
             if(points.empty()) continue;
 
-            if (int(points.size()) > max_points_count){
-                valid_max_points = points;
-                max_points_count = points.size(); 
-            }
+            // 逻辑1： 取三个面中最大的面填充 roi_image
+            // if (int(points.size()) > max_points_count){
+            //     valid_max_points = points;
+            //     max_points_count = points.size(); 
+            // }
+
+            // 逻辑2： 同时取三个面填来充 roi_image
+            valid_max_points.insert(valid_max_points.end(), points.begin(),points.end());
         }
         ///---------------------------------------------------------4.2 不更新 roi_image 的条件 -------------------------------
         bool is_update_img = is_update_image(box_lists,valid_max_points,exist_boxes,interested_boxes,i);
         if (!(is_update_img)) continue;
+        
         // 4.3 准备有效区域的掩码, 并更新有效区域的外接x_min,y_min,x_max,y_max
         int x_min = INT_MAX, x_max = INT_MIN;   
         int y_min = INT_MAX, y_max = INT_MIN;
@@ -167,6 +175,7 @@ void Ten_occlusion_handing::set_box_lists_(
         // 4.8 准备填充 box_lists 信息
         square_roi.copyTo(box_lists[i / 3].roi_image);
         box_lists[i / 3].zbuffer_flag = 1;
+        box_lists[i / 3].roi_valid_flag = 1;
     }
 
 

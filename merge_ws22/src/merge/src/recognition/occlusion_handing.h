@@ -52,6 +52,7 @@ struct box{
     float confidence = 0.0f;                // 自信度
     int zbuffer_flag = 0;                    // zbuffer是否处理的标志位， 0 表示未处理， 1 表示已处理， -1 表示异常
     int exist_flag = -1;                      // 是否筛空的标志位， 0 表示空， 1 表示有方块， -1 表示未处理
+    int roi_valid_flag = 0;                   // 用于表示当前的roi 图像是否有效
 };
 
 // 初始化方块和台阶的3d点，2d点的 结构体
@@ -344,7 +345,7 @@ private:
     )
     {
         bool update_image = true;
-        if (valid_max_points.empty() || valid_max_points.size() <= 600) {
+        if (valid_max_points.empty() || valid_max_points.size() <= 800) {
             std::cout << "🤡in func: set_box_lists_ 4.2, box idx= " <<  i / 3 + 1 <<  ", valid_max_points is empty or size() = " <<  valid_max_points.size()<< " < 600, skip crop ROI" << std::endl;
             // box_lists[i].zbuffer_flag = -1; // 标记异常
             update_image = false;
