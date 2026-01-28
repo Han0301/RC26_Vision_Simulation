@@ -1,0 +1,27 @@
+<launch>
+      <param name="arena_description" 
+            command="$(find xacro)/xacro '$(find zwei)/map1_add/urdf/map_6.urdf'"/>
+      
+      <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(find zwei)/worlds/competition.world"/>
+        <arg name="paused" value="false"/>
+        <arg name="use_sim_time" value="true"/>
+        <arg name="gui" value="true"/>
+        <arg name="headless" value="false"/>
+        <arg name="debug" value="false"/>
+      </include>
+      
+      <node name="spawn_arena" pkg="gazebo_ros" type="spawn_model"
+            args="-urdf -param arena_description -model competition_area -x 0 -y 0 -z 0"
+            respawn="false" output="screen"/>
+
+      <node name="spawn_robot" pkg="gazebo_ros" type="spawn_model" 
+            
+            args="-urdf -param robot_description -model mbot -x 4.6 -y 0.4 -z 2 -Y 1.570796"
+            respawn="false" output="screen"/> 
+      <arg name="model" default="$(find wpr_simulation)/models/wpb_home.model"/>
+      <param name="robot_description" command="$(find xacro)/xacro $(arg model)" />
+      <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+      <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" /> 
+      
+    </launch>

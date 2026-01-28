@@ -1,0 +1,8 @@
+<launch>
+    <param name="save_root_path" value="/home/awwsome/datasets/juanZhou_gazebo20/" type="string"/>
+    <param name="map_file_path" value="$(find zwei)/map1_add/" type="string"/> 
+    <param name="txt_root_name" value="map_" type="string"/>
+    <param name="image_root_name" value="juanZhou_gazebo20" type="string"/>
+    <node pkg="3dto2d" type="zbuffer_func_node" name="zbuffer_func" output="screen"/>
+
+</launch>
