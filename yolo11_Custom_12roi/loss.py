@@ -58,7 +58,6 @@ class YOLO11ROIFocalLoss3C(nn.Module):
             valid_neg_idx = torch.where(cls_target[b_idx] == 1)[0]  # 1类（有效无方块）
             valid_pos_idx = torch.where(cls_target[b_idx] == 2)[0]  # 2类（有效有方块）
 
-            # ========== 修复点1：空样本时返回空张量（而非空列表） ==========
             # 正样本采样：保证始终返回tensor（同设备、同类型）
             if len(valid_pos_idx) > 0:
                 select_pos = valid_pos_idx[torch.randperm(len(valid_pos_idx))[:self.max_positive]]
@@ -71,13 +70,11 @@ class YOLO11ROIFocalLoss3C(nn.Module):
             else:
                 select_neg = torch.tensor([], dtype=torch.long, device=device)  # 空tensor
 
-            # ========== 修复点2：torch.cat仅拼接tensor，else返回空tensor ==========
             if len(select_pos) + len(select_neg) > 0:
                 selected_roi = torch.cat([select_pos, select_neg])
             else:
                 selected_roi = torch.tensor([], dtype=torch.long, device=device)  # 空tensor
 
-            # 仅当有选中的ROI时赋值，避免空tensor索引报错
             if len(selected_roi) > 0:
                 selected_mask[b_idx, selected_roi] = 1.0
 

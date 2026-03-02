@@ -2,6 +2,7 @@
 import torch
 # 导入PyTorch神经网络模块：包含所有层（Conv/Linear/C2f等）的基类
 import torch.nn as nn
+from ultralytics import YOLO
 # 从ultralytics（YOLO官方库）导入YOLO11核心模块：Conv（卷积层）、C2f（特征融合层）、SPPF（空间金字塔池化）
 from ultralytics.nn.modules import Conv, C2f, SPPF
 # 导入numpy：用于数值计算（如ROI损失的数组统计）
@@ -352,3 +353,99 @@ def evaluate(model, val_loader, loss_fn, device):
     return (avg_val_loss, val_roi_avg_loss, avg_total_acc, avg_valid_acc,
             avg_pos_acc, avg_pos_precision, avg_pos_recall, avg_pos_f1,
             avg_neg_acc, avg_neg_precision, avg_neg_recall, avg_neg_f1)
+
+def load_yolo11_pretrained_weights(model, model_size, load_path):
+    """
+    加载YOLO11预训练权重并精准对齐到你的YOLO11ROIClassifier模型
+    :param model: 你的YOLO11ROIClassifier实例
+    :param model_size: 模型尺寸 "n"/"s"/"l"
+    :return: 加载权重后的模型
+    """
+    # 1. 加载Ultralytics官方YOLO11预训练模型
+    print(f"📥 加载YOLO11-{model_size.upper()}预训练权重...")
+    yolo11_official = YOLO(load_path)
+    official_state_dict = yolo11_official.model.state_dict()
+
+    # 2. 构建精准的键名映射表（核心：官方层编号 → 你的模型层名）
+    # 官方层编号: 0→layer0, 1→layer1, ..., 8→layer8, 9→layer9
+    mapped_state_dict = {}
+    current_model_dict = model.state_dict()
+
+    # 遍历所有官方权重键
+    for official_key, official_param in official_state_dict.items():
+        # 跳过和分类头相关的权重（官方YOLO11的检测头）
+        if any(key in official_key for key in ["detect", "bbox", "cls"]):
+            continue
+
+        # 拆分官方键名，例如："model.0.conv.weight" → ["model", "0", "conv", "weight"]
+        parts = official_key.split(".")
+        if len(parts) < 3 or parts[0] != "model":
+            continue  # 跳过非模型层的权重
+
+        # 提取官方层编号（如0,1,2...）
+        try:
+            official_layer_idx = int(parts[1])
+        except ValueError:
+            continue  # 跳过非数字编号的层
+
+        # 确定目标模块（backbone/neck）和目标层名
+        if 0 <= official_layer_idx <= 7:
+            # 官方层0-7 → 你的backbone.layer0-layer7
+            target_module = "backbone"
+            target_layer_name = f"layer{official_layer_idx}"
+        elif 8 <= official_layer_idx <= 9:
+            # 官方层8-9 → 你的neck.layer8-layer9
+            target_module = "neck"
+            target_layer_name = f"layer{official_layer_idx}"
+        else:
+            continue  # 跳过10及以后的层（官方检测头）
+
+        # 构建你的模型键名（替换前缀）
+        # 示例：官方"model.0.conv.weight" → 你的"backbone.layer0.conv.weight"
+        target_key_parts = [target_module, target_layer_name] + parts[2:]
+        target_key = ".".join(target_key_parts)
+
+        # 检查当前模型是否有该键，且形状匹配
+        if target_key in current_model_dict:
+            if current_model_dict[target_key].shape == official_param.shape:
+                mapped_state_dict[target_key] = official_param
+                print(f"✅ 匹配权重: {official_key:40s} → {target_key}")
+            else:
+                print(f"⚠️ 跳过权重（形状不匹配）: {official_key}")
+                print(f"   官方形状: {official_param.shape} | 你的模型形状: {current_model_dict[target_key].shape}")
+        else:
+            print(f"⚠️ 跳过权重（键不存在）: {official_key} → {target_key}")
+
+    # 3. 加载对齐后的权重（strict=False跳过head等不匹配层）
+    print("\n🔧 开始加载权重到模型...")
+    missing_keys, unexpected_keys = model.load_state_dict(mapped_state_dict, strict=False)
+
+    # 4. 打印加载结果统计
+    print(f"\n📊 权重加载结果:")
+    print(f"   ✅ 成功加载权重数: {len(mapped_state_dict)}")
+    print(f"   ⚠️  未加载的键（自定义head）: {len(missing_keys)}")
+    print(f"   ❌ 意外的键: {len(unexpected_keys)}")
+
+    # 打印关键缺失键（仅前5个，避免刷屏）
+    if missing_keys:
+        print(f"   主要缺失键（自定义层）: {missing_keys[:5]}")
+
+    # 5. 验证权重是否加载成功（检查backbone第一层卷积）
+    print("\n🔍 验证权重加载效果...")
+    # 对比官方第一层卷积和你的模型第一层卷积
+    try:
+        # 修复：直接取layer0.conv.weight，去掉多余的.conv
+        your_first_conv = model.backbone.layer0.conv.weight.data.cpu().numpy()
+        official_first_conv = official_state_dict.get("model.0.conv.weight", None)
+
+        if official_first_conv is not None:
+            official_first_conv_np = official_first_conv.cpu().numpy()
+            # 检查前10个值是否接近（允许微小浮点误差）
+            is_match = np.allclose(official_first_conv_np[:10], your_first_conv[:10], atol=1e-6)
+            print(f"   Backbone第一层卷积权重匹配: {'✅' if is_match else '❌'}")
+        else:
+            print(f"   ⚠️  无法验证：官方模型无第一层卷积权重")
+    except Exception as e:
+        print(f"   ⚠️  验证失败: {str(e)}")
+
+    return model
