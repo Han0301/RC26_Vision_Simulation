@@ -1,73 +1,87 @@
 import os
 import torch
 import numpy as np
-from torch.utils.data import DataLoader, Subset
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torchvision import transforms
+from torch.utils.data import DataLoader, Subset     # subset: PyTorch 数据集子集化工具，基于索引提取数据集的一部分
+from torch.optim.lr_scheduler import CosineAnnealingLR      # 余弦退火学习率调度器，让学习率按余弦函数周期性衰减
+from torchvision import transforms      # torchvision 的图像变换模块，用于数据增强 / 预处理
 
+# 自定义模块
 from dataset import ROI12ImageDataset
 from model import YOLO11ROIClassifier, calculate_3c_metrics, evaluate, load_yolo11_pretrained_weights
 from loss import YOLO11ROIFocalLoss3C
 
-# ===================== 核心配置 =====================
+# ===================== 1. 核心配置 =====================
+# 1.1 模型本身相关
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ROI_IMG_SIZE = 64
-NUM_ROI = 12
-NUM_CLASSES = 3
-MODEL_SIZE = "s"
-BATCH_SIZE = 16
-EPOCHS = 100
-LEARNING_RATE = 5e-5 if MODEL_SIZE == "l" else 1e-4 if MODEL_SIZE == "s" else 1e-3
-WEIGHT_DECAY = 5e-4
-DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"
-SAVE_DIR = "./checkpoints"
-VAL_RATIO = 0.2
+ROI_IMG_SIZE = 64       # roi图像大小
+NUM_ROI = 12            # roi数量
+NUM_CLASSES = 3         # 分类数
+MODEL_SIZE = "s"        # 模型尺寸
 
-# ===================== 数据预处理 =====================
+# 1.2 数据集和训练相关
+BATCH_SIZE = 16         # 加载图像的批次
+EPOCHS = 100            # 训练总轮数
+VAL_RATIO = 0.2         # 验证集的占比
+patience = 12           # 耐心
+mixup_rate = 0.2        # mixup使用的比率
+mixup_alpha = 0.2       # mixup增强的beta 分布参数
+DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"       # 数据集路径
+SAVE_DIR = "./checkpoints"      # 输出的模型路径
+
+# 1.3 损失函数和优化器相关
+LOSS_WEIGHT= [1.0, 5.0, 2.0]    # 损失在三个类别上面的权重
+FOCAL_LOSS = 1.5                # 难样本挖掘系数
+LEARNING_RATE = 5e-5 if MODEL_SIZE == "l" else 1e-4 if MODEL_SIZE == "s" else 1e-3          # 学习率
+WEIGHT_DECAY = 5e-4     # 权重衰减（L2 正则），防止模型过拟合
+
+# ===================== 2. 数据预处理 =====================
+# 2.1 归一化和标准差
 yolo11_mean = [0.485, 0.456, 0.406]
 yolo11_std = [0.229, 0.224, 0.225]
 
+# 2.2 数据增强
 train_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=(0,0.1)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(15),
-    transforms.RandomAffine(degrees=0, translate=(0.15, 0.15), scale=(0.8, 1.2), shear=10),
-    transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=yolo11_mean, std=yolo11_std)
+    transforms.ToPILImage(),        # 将 numpy 数组 / 张量转为 PIL 图像（因为多数变换仅支持 PIL 格式）。
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=(0,0.1)),      # 颜色的扰动
+    transforms.RandomHorizontalFlip(p=0.5),         # 50% 概率随机水平翻转
+    transforms.RandomRotation(15),                  # 随机旋转 ±15 度
+    transforms.RandomAffine(degrees=0, translate=(0.15, 0.15), scale=(0.8, 1.2), shear=10),     # 随机仿射变换（平移 / 缩放 / 剪切），degrees=0 表示不旋转
+    transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),       # 随机高斯模糊（核大小 3，sigma 范围 0.1~2.0）
+    transforms.ToTensor(),                                          # 将 PIL 图像转为张量
+    transforms.Normalize(mean=yolo11_mean, std=yolo11_std)          # 同时将像素值从 [0,255] 归一化到 [0,1]
 ])
 
+# 验证集仅做基础变换（保证评估准确）
 val_test_transform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.ToTensor(),
     transforms.Normalize(mean=yolo11_mean, std=yolo11_std)
 ])
 
-# ===================== 修复 1：加载数据集（彻底解决 Transform 污染） =====================
+# ===================== 3. 加载数据集 =====================
 print("=== 正在加载数据集 ===")
-# 1. 先创建一个临时数据集仅用于计算长度和生成索引
+# 3.1 先创建一个临时数据集 仅用于计算长度和生成索引
 temp_dataset = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=None)
 dataset_size = len(temp_dataset)
 val_size = int(VAL_RATIO * dataset_size)
 train_size = dataset_size - val_size
 
-# 2. 生成随机且互斥的索引
+# 3.2 生成随机且互斥的索引
 # 注意：这里为了确保可复现性，可以固定一个seed，也可以不固定
 indices = torch.randperm(dataset_size).tolist()
 train_indices = indices[:train_size]
 val_indices = indices[train_size:]
 
-# 3. 关键步骤：实例化两个完全独立的 Dataset 对象
+# 3.3 实例化两个完全独立的 Dataset 对象
 # 这样它们的 transform 互不干扰
 train_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
 val_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
 
-# 4. 使用 Subset 根据索引包装
+# 3.4 使用 Subset 根据索引包装
 train_dataset = Subset(train_dataset_full, train_indices)
 val_dataset = Subset(val_dataset_full, val_indices)
 
-# 5. 创建 DataLoader
+# 3.5 创建 DataLoader
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=False,
                           drop_last=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=False,
@@ -79,7 +93,8 @@ print(f"验证集：{val_size}样本 | {len(val_loader)}批次")
 print(f"训练设备：{DEVICE} | 模型尺寸：YOLO11-{MODEL_SIZE.upper()}")
 print("=" * 80)
 
-# ===================== 初始化模型/损失/优化器 =====================
+# ===================== 4 初始化模型/损失/优化器 =====================
+# 4.1 加载模型
 model = YOLO11ROIClassifier(
     model_size=MODEL_SIZE,
     num_roi=NUM_ROI,
@@ -87,84 +102,51 @@ model = YOLO11ROIClassifier(
     roi_size=ROI_IMG_SIZE
 ).to(DEVICE)
 
+# 4.2 加载预训练权重
 model = load_yolo11_pretrained_weights(model, model_size=MODEL_SIZE,
                                        load_path="H:\pycharm\yolov11\yolov11.pt\yolo11s.pt")
 
+# 4.3 加载损失
 loss_fn = YOLO11ROIFocalLoss3C(
     num_roi=NUM_ROI,
     num_classes=NUM_CLASSES,
-    alpha=[1.0, 5.0, 2.0],
-    gamma=1.5,
+    alpha=LOSS_WEIGHT,         # 损失在三个类别上面的权重
+    gamma=FOCAL_LOSS,          # Focal Loss 难样本挖掘系数
     max_positive=8,
     max_negative=4
 ).to(DEVICE)
 
-# 冻结策略
+# 4.4 参数的冻结策略
 for name, param in model.backbone.named_parameters():
     if "layer0" in name or "layer1" in name or "layer2" in name:
         param.requires_grad = False
     else:
         param.requires_grad = True
 
-# 修正后的参数分组定义
+
+# 4.5 分层学习率
 param_groups = [
     {"params": [p for n, p in model.backbone.named_parameters() if "layer0" in n or "layer1" in n or "layer2" in n],
      "lr": LEARNING_RATE * 0.001},
-    {"params": [p for n, p in model.backbone.named_parameters() if
-                "layer0" not in n and "layer1" not in n and "layer2" not in n],
+    {"params": [p for n, p in model.backbone.named_parameters() if "layer0" not in n and "layer1" not in n and "layer2" not in n],
      "lr": LEARNING_RATE * 0.1},
     {"params": model.neck.parameters(), "lr": LEARNING_RATE * 0.5},
     {"params": model.head.parameters(), "lr": LEARNING_RATE}
 ]
 
-optimizer = torch.optim.AdamW(param_groups, weight_decay=WEIGHT_DECAY)
+# 4.6 优化器
+optimizer = torch.optim.AdamW(param_groups, weight_decay=WEIGHT_DECAY)      # adamw: 带权重衰减的优化器
+
+# 4.7 学习率调度器(余弦退火)
 scheduler = CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
 
-
-# ===================== 训练集测试函数 =====================
-def test_train_set(model, train_loader, device):
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for batch_idx, (roi_imgs, cls_target, roi_valid_mask) in enumerate(train_loader):
-            roi_imgs = roi_imgs.to(device)
-            cls_target = cls_target.to(device)
-            roi_valid_mask = roi_valid_mask.to(device)
-
-            pred_logits = model(roi_imgs)
-            pred_cls = torch.argmax(pred_logits, dim=-1)
-            pred_cls[~roi_valid_mask] = 0
-
-            correct += (pred_cls == cls_target).sum().item()
-            total += cls_target.numel()
-
-            if batch_idx < 3:
-                print(f"【训练集测试】Batch {batch_idx}")
-                print(f"真实标签：{cls_target[0].cpu().numpy()}")
-                print(f"预测标签：{pred_cls[0].cpu().numpy()}")
-                print("-" * 50)
-                # 简单看一下前几张图的均值，确认确实有数据增强
-                # print(f"图像均值(验证增强): {roi_imgs[0].mean():.3f}")
-
-    acc = correct / total
-    print(f"\n训练集整体准确率：{acc:.4f}")
-    model.train()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    return acc
-
-
-# ===================== 训练循环 =====================
+# ===================== 5 训练循环 =====================
 os.makedirs(SAVE_DIR, exist_ok=True)
 best_pos_f1 = 0.0
-patience = 12
-mixup_alpha = 0.2
 no_improve = 0
 
 print(f"=== 开始训练（YOLO11-{MODEL_SIZE.upper()}） ===")
 print("\n=== 训练前测试训练集 ===")
-test_train_set(model, train_loader, DEVICE)
 
 for epoch in range(EPOCHS):
     model.train()
@@ -188,7 +170,7 @@ for epoch in range(EPOCHS):
         pred_logits = None
 
         # ---------------------- MixUp增强开始 ----------------------
-        if np.random.rand() < 0.3:
+        if np.random.rand() < mixup_rate:
             is_mixup = True
             try:
                 roi_imgs2, cls_target2, _ = next(train_iter)
@@ -306,11 +288,6 @@ for epoch in range(EPOCHS):
     # 保存本轮模型
     epoch_save_path = os.path.join(SAVE_DIR, f"yolo11_{MODEL_SIZE}_roi_epoch_{epoch + 1}_3c.pt")
     torch.save(model.state_dict(), epoch_save_path)
-
-    # 每10轮测试训练集
-    if (epoch + 1) % 10 == 0:
-        print(f"\n=== Epoch {epoch + 1} 训练集测试 ===")
-        test_train_set(model, train_loader, DEVICE)
 
 print("=== 训练完成 ===")
 print(f"最优模型路径：{os.path.join(SAVE_DIR, f'yolo11_{MODEL_SIZE}_roi_best_3c.pt')}")
