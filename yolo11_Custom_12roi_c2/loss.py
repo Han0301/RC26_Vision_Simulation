@@ -1,15 +1,29 @@
 import torch
 import torch.nn as nn
-import numpy as np
 
+# 对全局数量的约束正则损失(二分类, 移除无效类别)
+class YOLO11ROICOUNTLOSS(nn.Module):
+    def __init__(self, exist_count = 8, weight = 0.1):       # weight 表示该数量限制对整体损失的主导性,
+        super().__init__()
+        self.exist_count = exist_count
+        self.weight = weight
 
-class YOLO11ROIFocalLoss3C(nn.Module):
-    """YOLO11原生Focal Loss（适配三分类+12个ROI）"""
+    def forward(self, pred_logits):
+        pred = torch.softmax(pred_logits, dim=-1)       # [B, 12, 2]
+        pred_exist = pred[...,1]        # [B, 12 ] 每个roi落在1类的概率
+        pred_exist_count = pred_exist.sum(dim=-1)       # 直接使用概率作为期望数量
+        count_loss = torch.mean((pred_exist_count - self.exist_count) ** 2)     # mse 损失
+        return self.weight * count_loss
 
-    def __init__(self, num_roi=12, num_classes=3,
-                 alpha=[1.0, 2.0, 5.0], gamma=1.5,  # YOLO11默认gamma=1.5
+# 损失设计
+class YOLO11ROIFocalLoss2C(nn.Module):
+
+    def __init__(self, num_roi=12, num_classes=2,
+                 alpha=None, gamma=1.5,  # YOLO11默认gamma=1.5
                  max_positive=8, max_negative=4):
         super().__init__()
+        if alpha is None:
+            alpha = [2.0, 1.0]
         self.num_roi = num_roi
         self.num_classes = num_classes
         self.alpha = torch.tensor(alpha, dtype=torch.float32)  # 0/1/2类权重（YOLO11正样本高权重）
@@ -55,25 +69,25 @@ class YOLO11ROIFocalLoss3C(nn.Module):
         selected_mask = torch.zeros_like(focal_loss, device=device)
         for b_idx in range(B):
             # 区分各类ROI（YOLO11重点采样正样本）
-            valid_neg_idx = torch.where(cls_target[b_idx] == 1)[0]  # 1类（有效无方块）
-            valid_pos_idx = torch.where(cls_target[b_idx] == 2)[0]  # 2类（有效有方块）
+            neg_idx = torch.where(cls_target[b_idx] == 0)[0]  # 负样本（无方块）
+            pos_idx = torch.where(cls_target[b_idx] == 1)[0]  # 正样本（有方块）
 
-            # 正样本采样：保证始终返回tensor（同设备、同类型）
-            if len(valid_pos_idx) > 0:
-                select_pos = valid_pos_idx[torch.randperm(len(valid_pos_idx))[:self.max_positive]]
+            # 正样本采样
+            if len(pos_idx) > 0:
+                select_pos = pos_idx[torch.randperm(len(pos_idx))[:self.max_positive]]
             else:
-                select_pos = torch.tensor([], dtype=torch.long, device=device)  # 空tensor
+                select_pos = torch.tensor([], dtype=torch.long, device=device)
 
-            # 负样本采样：保证始终返回tensor（同设备、同类型）
-            if len(valid_neg_idx) > 0:
-                select_neg = valid_neg_idx[torch.randperm(len(valid_neg_idx))[:self.max_negative]]
+            # 负样本采样
+            if len(neg_idx) > 0:
+                select_neg = neg_idx[torch.randperm(len(neg_idx))[:self.max_negative]]
             else:
-                select_neg = torch.tensor([], dtype=torch.long, device=device)  # 空tensor
+                select_neg = torch.tensor([], dtype=torch.long, device=device)
 
             if len(select_pos) + len(select_neg) > 0:
                 selected_roi = torch.cat([select_pos, select_neg])
             else:
-                selected_roi = torch.tensor([], dtype=torch.long, device=device)  # 空tensor
+                selected_roi = torch.tensor([], dtype=torch.long, device=device)
 
             if len(selected_roi) > 0:
                 selected_mask[b_idx, selected_roi] = 1.0

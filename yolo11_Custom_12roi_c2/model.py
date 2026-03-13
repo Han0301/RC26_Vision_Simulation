@@ -193,167 +193,108 @@ class YOLO11ROIClassifier(nn.Module):
         return pred_logits
 
 
-# ===================== 指标计算/验证函数（无修改） =====================
-def calculate_3c_metrics(pred_logits, cls_target):
+# ===================== 二分类指标计算（核心修改） =====================
+def calculate_2c_metrics(pred_logits, cls_target):
     """
-    计算三分类任务的核心指标（总准确率/有效准确率/正/负样本精准率/召回率/F1）
-    :param pred_logits: 模型输出 → [B,12,3]（logits值）
-    :param cls_target: 真实标签 → [B,12]（0=无效ROI，1=有效无方块，2=有效有方块）
-    :return: 指标字典 → 包含各类准确率、精准率、召回率、F1
+    计算二分类任务的核心指标（总准确率/正样本精准率/召回率/F1）
+    :param pred_logits: 模型输出 → [B,12,2]（logits值）
+    :param cls_target: 真实标签 → [B,12]（0=无方块，1=有方块）
+    :return: 指标字典 → 包含总准确率、正样本指标
     """
-    # 1. 从logits中获取预测类别（argmax取维度-1的最大值索引）→ [B,12]
-    pred_cls = torch.argmax(pred_logits, dim=-1)
-    B, num_roi = pred_cls.shape  # 获取批次B和ROI数（固定12）
+    # 1. 获取预测类别
+    pred_cls = torch.argmax(pred_logits, dim=-1)  # [B,12]
+    B, num_roi = pred_cls.shape
 
-    # 2. 计算总准确率（所有ROI，含无效ROI）
-    total_correct = (pred_cls == cls_target).sum().item()  # 总正确数（标量）
-    total_acc = total_correct / (cls_target.numel() + 1e-6)  # 总准确率（+1e-6避免除0）
+    # 2. 计算总准确率
+    total_correct = (pred_cls == cls_target).sum().item()
+    total_acc = total_correct / (cls_target.numel() + 1e-6)
 
-    # 3. 计算有效ROI掩码（仅1/2类为有效ROI，0类为无效）→ [B,12]（bool张量）
-    valid_mask = (cls_target != 0)
-    valid_total = valid_mask.sum().item()  # 有效ROI总数
+    # 3. 计算正样本（1类：有方块）指标
+    # 正样本真实掩码
+    pos_target_mask = (cls_target == 1)
+    # 正样本预测掩码
+    pos_pred_mask = (pred_cls == 1)
+    pos_total = pos_target_mask.sum().item()
 
-    # 4. 处理无有效ROI的边界情况
-    if valid_total == 0:
-        valid_acc = 0.0  # 有效准确率
-        # 正样本（2类）指标初始化
-        pos_metrics = {"acc": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0}
-        # 负样本（1类）指标初始化
-        neg_metrics = {"acc": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0}
-    else:
-        # 5. 计算有效ROI准确率
-        valid_correct = (pred_cls[valid_mask] == cls_target[valid_mask]).sum().item()
-        valid_acc = valid_correct / valid_total
+    # 正样本准确率
+    pos_correct = (pred_cls[pos_target_mask] == cls_target[pos_target_mask]).sum().item() if pos_total > 0 else 0.0
+    pos_acc = pos_correct / (pos_total + 1e-6)
 
-        # 6. 计算正样本（2类：有效有方块）指标
-        # 正样本真实掩码 → [B,12]（bool）
-        pos_target_mask = (cls_target == 2) & valid_mask
-        # 正样本预测掩码 → [B,12]（bool）
-        pos_pred_mask = (pred_cls == 2) & valid_mask
-        pos_total = pos_target_mask.sum().item()  # 正样本总数
+    # 混淆矩阵
+    tp = (pos_pred_mask & pos_target_mask).sum().item()  # 真阳性
+    fn = ((~pos_pred_mask) & pos_target_mask).sum().item()  # 假阴性
+    fp = (pos_pred_mask & (~pos_target_mask)).sum().item()  # 假阳性
 
-        # 正样本准确率（仅正样本的分类正确率）
-        pos_correct = (pred_cls[pos_target_mask] == cls_target[pos_target_mask]).sum().item() if pos_total > 0 else 0.0
-        pos_acc = pos_correct / (pos_total + 1e-6)
+    # 精准率、召回率、F1
+    pos_precision = tp / (tp + fp + 1e-6)
+    pos_recall = tp / (tp + fn + 1e-6)
+    pos_f1 = 2 * pos_precision * pos_recall / (pos_precision + pos_recall + 1e-6)
 
-        # 正样本TP/TN/FP/FN（混淆矩阵）
-        tp = (pos_pred_mask & pos_target_mask).sum().item()  # 真阳性（预测2，真实2）
-        fn = ((~pos_pred_mask) & pos_target_mask).sum().item()  # 假阴性（预测非2，真实2）
-        fp = (pos_pred_mask & (~pos_target_mask)).sum().item()  # 假阳性（预测2，真实非2）
-        # 精准率（Precision）：TP/(TP+FP) → 预测为正的样本中，真实为正的比例
-        pos_precision = tp / (tp + fp + 1e-6)
-        # 召回率（Recall）：TP/(TP+FN) → 真实为正的样本中，预测为正的比例
-        pos_recall = tp / (tp + fn + 1e-6)
-        # F1分数：2*P*R/(P+R) → 平衡精准率和召回率
-        pos_f1 = 2 * pos_precision * pos_recall / (pos_precision + pos_recall + 1e-6)
-        pos_metrics = {"acc": pos_acc, "precision": pos_precision, "recall": pos_recall, "f1": pos_f1}
-
-        # 7. 计算负样本（1类：有效无方块）指标
-        # 负样本真实掩码 → [B,12]（bool）
-        neg_target_mask = (cls_target == 1) & valid_mask
-        # 负样本预测掩码 → [B,12]（bool）
-        neg_pred_mask = (pred_cls == 1) & valid_mask
-        neg_total = neg_target_mask.sum().item()  # 负样本总数
-
-        # 负样本准确率（仅负样本的分类正确率）
-        neg_correct = (pred_cls[neg_target_mask] == cls_target[neg_target_mask]).sum().item() if neg_total > 0 else 0.0
-        neg_acc = neg_correct / (neg_total + 1e-6)
-
-        # 负样本TN/FN/FP（混淆矩阵）
-        tn = (neg_pred_mask & neg_target_mask).sum().item()  # 真阴性（预测1，真实1）
-        fn_neg = ((~neg_pred_mask) & neg_target_mask).sum().item()  # 假阴性（预测非1，真实1）
-        fp_neg = (neg_pred_mask & (~neg_target_mask)).sum().item()  # 假阳性（预测1，真实非1）
-        # 精准率（Precision）：TN/(TN+FP)
-        neg_precision = tn / (tn + fp_neg + 1e-6)
-        # 召回率（Recall）：TN/(TN+FN)
-        neg_recall = tn / (tn + fn_neg + 1e-6)
-        # F1分数
-        neg_f1 = 2 * neg_precision * neg_recall / (neg_precision + neg_recall + 1e-6)
-        neg_metrics = {"acc": neg_acc, "precision": neg_precision, "recall": neg_recall, "f1": neg_f1}
-
-    # 8. 返回所有指标
+    # 返回指标
     return {
-        "total_acc": total_acc,          # 总准确率（含无效ROI）
-        "valid_acc": valid_acc,          # 有效ROI准确率
-        "pos_metrics": pos_metrics,      # 正样本（2类）指标
-        "neg_metrics": neg_metrics       # 负样本（1类）指标
+        "total_acc": total_acc,
+        "pos_metrics": {"acc": pos_acc, "precision": pos_precision, "recall": pos_recall, "f1": pos_f1}
     }
 
 
+# ===================== 二分类验证函数（核心修改） =====================
 def evaluate(model, val_loader, loss_fn, device):
     """
-    模型验证函数：计算验证集的平均损失、各ROI平均损失、各类指标均值
+    模型验证函数：计算验证集的平均损失、二分类指标均值
     :param model: 训练好的YOLO11ROIClassifier模型
-    :param val_loader: 验证集数据加载器 → 输出(roi_imgs, cls_target, roi_valid_mask)
-    :param loss_fn: 损失函数（YOLO11ROIFocalLoss3C）
+    :param val_loader: 验证集数据加载器
+    :param loss_fn: 损失函数（YOLO11ROIFocalLoss2C）
     :param device: 计算设备（cpu/cuda）
-    :return: 各类平均指标（损失、准确率、精准率、召回率、F1）
+    :return: 二分类相关平均指标
     """
-    # 1. 模型切换为验证模式（禁用Dropout/BatchNorm的训练行为）
     model.eval()
-    # 2. 初始化统计变量
-    val_epoch_loss = 0.0  # 验证集总损失
-    batch_count = 0       # 验证集批次数量
-    val_roi_loss = np.zeros(12)  # 12个ROI的总损失（初始化为0）
+    val_epoch_loss = 0.0
+    batch_count = 0
+    val_roi_loss = np.zeros(12)
 
-    # 3. 初始化指标累加变量（用于计算均值）
-    total_acc_sum = 0.0          # 总准确率累加
-    valid_acc_sum = 0.0          # 有效准确率累加
-    pos_acc_sum, pos_precision_sum, pos_recall_sum, pos_f1_sum = 0.0, 0.0, 0.0, 0.0  # 正样本指标累加
-    neg_acc_sum, neg_precision_sum, neg_recall_sum, neg_f1_sum = 0.0, 0.0, 0.0, 0.0  # 负样本指标累加
-
-    # 4. 禁用梯度计算（验证阶段无需反向传播，节省内存）
+    # 初始化二分类指标累加
+    total_acc_sum = 0.0
+    pos_acc_sum, pos_precision_sum, pos_recall_sum, pos_f1_sum = 0.0, 0.0, 0.0, 0.0
+    pred_cls_all = []
     with torch.no_grad():
-        # 5. 遍历验证集每个批次
         for batch_idx, (roi_imgs, cls_target, roi_valid_mask) in enumerate(val_loader):
-            # 6. 将数据移至指定设备（cpu/cuda）
             roi_imgs = roi_imgs.to(device)
             cls_target = cls_target.to(device)
 
-            # 7. 模型推理 → 输出pred_logits [B,12,3]
             pred_logits = model(roi_imgs)
-            # 8. 计算批次损失
             loss = loss_fn(pred_logits, cls_target)
 
-            # 9. 累加损失和批次计数
-            val_epoch_loss += loss.item()  # loss.item()转为标量，避免张量累加
+            val_epoch_loss += loss.item()
             batch_count += 1
-            val_roi_loss += loss_fn.per_roi_loss  # 累加12个ROI的损失
+            val_roi_loss += loss_fn.per_roi_loss
+            pred_cls = torch.argmax(pred_logits, dim=-1)  # [B,12]
+            pred_pos_count = (pred_cls == 1).sum(dim=1).cpu().numpy()  # 每张图正样本数
+            pred_cls_all.extend(pred_pos_count)
 
-            # 10. 计算批次指标并累加
-            metrics = calculate_3c_metrics(pred_logits, cls_target)
+            pred_pos_mean = np.mean(pred_cls_all)
+            pred_pos_std = np.std(pred_cls_all)
+            print(f"📊 验证集预测有方块数量：{pred_pos_mean:.2f} ± {pred_pos_std:.2f}（目标：8.00）")
+
+            # 计算二分类指标
+            metrics = calculate_2c_metrics(pred_logits, cls_target)
             total_acc_sum += metrics["total_acc"]
-            valid_acc_sum += metrics["valid_acc"]
             pos_acc_sum += metrics["pos_metrics"]["acc"]
             pos_precision_sum += metrics["pos_metrics"]["precision"]
             pos_recall_sum += metrics["pos_metrics"]["recall"]
             pos_f1_sum += metrics["pos_metrics"]["f1"]
-            neg_acc_sum += metrics["neg_metrics"]["acc"]
-            neg_precision_sum += metrics["neg_metrics"]["precision"]
-            neg_recall_sum += metrics["neg_metrics"]["recall"]
-            neg_f1_sum += metrics["neg_metrics"]["f1"]
 
-    # 11. 计算所有指标的均值（避免除0）
-    avg_val_loss = val_epoch_loss / batch_count if batch_count > 0 else 0.0  # 平均验证损失
-    val_roi_avg_loss = val_roi_loss / batch_count if batch_count > 0 else np.zeros(12)  # 12个ROI的平均损失
-    avg_total_acc = total_acc_sum / batch_count if batch_count > 0 else 0.0  # 平均总准确率
-    avg_valid_acc = valid_acc_sum / batch_count if batch_count > 0 else 0.0  # 平均有效准确率
-    # 正样本平均指标
+    # 计算均值
+    avg_val_loss = val_epoch_loss / batch_count if batch_count > 0 else 0.0
+    val_roi_avg_loss = val_roi_loss / batch_count if batch_count > 0 else np.zeros(12)
+    avg_total_acc = total_acc_sum / batch_count if batch_count > 0 else 0.0
     avg_pos_acc = pos_acc_sum / batch_count if batch_count > 0 else 0.0
     avg_pos_precision = pos_precision_sum / batch_count if batch_count > 0 else 0.0
     avg_pos_recall = pos_recall_sum / batch_count if batch_count > 0 else 0.0
     avg_pos_f1 = pos_f1_sum / batch_count if batch_count > 0 else 0.0
-    # 负样本平均指标
-    avg_neg_acc = neg_acc_sum / batch_count if batch_count > 0 else 0.0
-    avg_neg_precision = neg_precision_sum / batch_count if batch_count > 0 else 0.0
-    avg_neg_recall = neg_recall_sum / batch_count if batch_count > 0 else 0.0
-    avg_neg_f1 = neg_f1_sum / batch_count if batch_count > 0 else 0.0
 
-    # 12. 返回所有平均指标
-    return (avg_val_loss, val_roi_avg_loss, avg_total_acc, avg_valid_acc,
-            avg_pos_acc, avg_pos_precision, avg_pos_recall, avg_pos_f1,
-            avg_neg_acc, avg_neg_precision, avg_neg_recall, avg_neg_f1)
-
+    # 返回二分类指标（移除三分类相关）
+    return (avg_val_loss, val_roi_avg_loss, avg_total_acc,
+            avg_pos_acc, avg_pos_precision, avg_pos_recall, avg_pos_f1)
 def load_yolo11_pretrained_weights(model, model_size, load_path):
     """
     加载YOLO11预训练权重并精准对齐到你的YOLO11ROIClassifier模型
