@@ -25,9 +25,28 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
-
+#include <random>   // 现代随机数库（C++11及以上）
+#include <stdexcept> // 用于异常处理
 namespace Ten{
 
+float generateRandomFloat(float min_val, float max_val) {
+    // 检查参数合法性：下限必须小于上限
+    if (min_val >= max_val) {
+        throw std::invalid_argument("错误：随机数下限必须小于上限！");
+    }
+
+    // 1. 静态随机数引擎：仅初始化一次，避免重复序列（关键！）
+    // std::random_device 用于获取真随机种子（不同平台兼容性好）
+    static std::random_device rd;
+    // Mersenne Twister引擎：高性能、高随机性的伪随机数生成器
+    static std::mt19937 gen(rd());
+
+    // 2. 浮点数均匀分布：生成 [min_val, max_val] 区间的float
+    std::uniform_real_distribution<float> dist(min_val, max_val);
+
+    // 3. 生成并返回随机数
+    return dist(gen);
+}
 
 #define L_ 1.2f                 // 台阶长度
 #define H_ 0.2f                 // 台阶高度
@@ -39,9 +58,12 @@ namespace Ten{
 #define LIDAR_HEIGHT_ 0         // 雷达的高度 
 #define box_half_length_ 0.175  // 方块长度的一半
 #define step_half_length_ 0.6   //台阶水平边长的一半
-#define offset_x_ 0             // x方向上的偏移量
-#define offset_y_ 0             // y方向上的偏移量
-#define offset_z_ 0             // z方向上的偏移量
+// #define offset_x_ 0.06          // x方向上的偏移量
+// #define offset_y_ 0.06            // y方向上的偏移量
+// #define offset_z_ 0.06             // z方向上的偏移量
+#define offset_x_ 0.00          // x方向上的偏移量
+#define offset_y_ 0.00            // y方向上的偏移量
+#define offset_z_ 0.00             // z方向上的偏移量
 struct box{
     int idx;                             // 表示位置的下标索引
     cv::Mat roi_image;                   // 裁剪出来的roi图片
@@ -208,6 +230,7 @@ public:
     void set_debug_roi_image(
         std::vector<Ten::box>box_lists,
         cv::Mat& debug_best_roi_image);
+
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
@@ -345,7 +368,6 @@ private:
     bool is_update_image(
         const std::vector<box>& box_lists,
         const std::vector<cv::Point2f>& valid_max_points,
-        const int exist_boxes[12],
         const int interested_boxes[12],
         const int i
     )
@@ -356,7 +378,7 @@ private:
             // box_lists[i].zbuffer_flag = -1; // 标记异常
             update_image = false;
         }
-        else if (!(exist_boxes[i / 3] != 0 && interested_boxes[i / 3] == 1))
+        else if (interested_boxes[i / 3] == 0)
         {
             std::cout << "🤡in func: set_box_lists_ 4.2,!(exist_boxes[i] != 0 && interested_boxes[i] == 1), skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;

@@ -87,17 +87,37 @@ void Ten_occlusion_handing::set_box_lists_(
         cal_points_range(all_points,object_x_min,object_y_min,object_x_max,object_y_max);
         // 3.4.4 合并到方块深度缓冲 object_zbuffer + 全局深度缓冲 zbuffer, 并 写入当前方块范围的 depth_regions 
         std::unordered_map<float, std::vector<cv::Point2f>> depth_regions;        // depth_regions 表示 深度-对应深度的点集
-        for (int row = int(object_y_min) - 1; row < int(object_y_max) + 1; ++row) {
-            for (int col = int(object_x_min) - 1; col < int(object_x_max) + 1; ++col) {
-                if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
-                if (object_temp.at<float>(row, col) == FLT_MAX) continue;
-                if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
-                    zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
-                    object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+        std::cout << "place: " << i / 3;
+        if (exist_boxes[i / 3])
+        {
+            std::cout << " exist " << std::endl;
+            for (int row = int(object_y_min) - 1; row < int(object_y_max) + 1; ++row) {
+                for (int col = int(object_x_min) - 1; col < int(object_x_max) + 1; ++col) {
+                    if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
+                    if (object_temp.at<float>(row, col) == FLT_MAX) continue;
+                    if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
+                        zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                        object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                    }
+                    depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
                 }
-                depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
-            }
-        }     
+            }     
+        }
+        else
+        {
+            std::cout << " not exist " << std::endl;
+            for (int row = int(object_y_min) - 1; row < int(object_y_max) + 1; ++row) {
+                for (int col = int(object_x_min) - 1; col < int(object_x_max) + 1; ++col) {
+                    if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
+                    if (object_temp.at<float>(row, col) == FLT_MAX) continue;
+                    if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
+                        object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                    }
+                    depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
+                }
+            }   
+        }
+
         // 4 填充好单个方块的zbuffer深度信息后， 开始裁剪图像信息
         // 4.1 在当前方块范围内，找到 有效的，面积最大的（认为在方块几个面中最优）的 点集 valid_max_points
         int max_points_count = INT_MIN;
@@ -122,7 +142,7 @@ void Ten_occlusion_handing::set_box_lists_(
             valid_max_points.insert(valid_max_points.end(), points.begin(),points.end());
         }
         ///---------------------------------------------------------4.2 不更新 roi_image 的条件 -------------------------------
-        bool is_update_img = is_update_image(box_lists,valid_max_points,exist_boxes,interested_boxes,i);
+        bool is_update_img = is_update_image(box_lists,valid_max_points,interested_boxes,i);
         if (!(is_update_img)) continue;
         
         // 4.3 准备有效区域的掩码, 并更新有效区域的外接x_min,y_min,x_max,y_max
@@ -195,11 +215,8 @@ cv::Mat Ten_occlusion_handing::update_debug_image(
 
     for (size_t i = 0; i < object_plum_2d_points_.size(); i++) {
         
-        if (i < 96 && i % 8 == 0){
-        cv::line(img, object_plum_2d_points_[i], object_plum_2d_points_[i + 1], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 1], object_plum_2d_points_[i + 2], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 2], object_plum_2d_points_[i + 3], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 3], object_plum_2d_points_[i], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+        if (i < 96){
+        cv::circle(img, object_plum_2d_points_[i],3, cv::Scalar(0,255,0), -1);
     }   
 }
 return img;

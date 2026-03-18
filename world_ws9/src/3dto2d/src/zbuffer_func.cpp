@@ -118,7 +118,7 @@ void zbuffer_process()
 
     Ten::_INIT_3D_BOX_.pcl_to_C();
 
-    int exist_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+    int exist_boxes[12] = {1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1};
     int interested_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
