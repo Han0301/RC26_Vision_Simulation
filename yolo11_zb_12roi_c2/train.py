@@ -25,11 +25,19 @@ if __name__ == '__main__':
     # 1.2 数据集和训练相关
     BATCH_SIZE = 16         # 加载图像的批次
     EPOCHS = 100            # 训练总轮数
-    VAL_RATIO = 0.2         # 验证集的占比
     patience = 8           # 耐心
     mixup_rate = 0.2        # mixup触发的概率
     mixup_alpha = 0.2       # mixup增强的beta 分布参数
-    DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_4018"       # 数据集路径
+
+    # 加载数据集的方式
+    load_datasets = False
+    # 1 指定数据集
+    DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"       # 数据集路径
+    VAL_RATIO = 0.2         # 验证集的占比
+    # 2 指定数据集和验证集
+    TRAIN_DATASETS = r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"
+    VAL_DATASETS = r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"
+
     SAVE_DIR = "./checkpoints"      # 输出的模型路径
 
     # 1.3 损失函数和优化器相关
@@ -37,7 +45,7 @@ if __name__ == '__main__':
     FOCAL_LOSS = 1.5                # 难样本挖掘系数
     LEARNING_RATE = 5e-5 if MODEL_SIZE == "l" else 1e-4 if MODEL_SIZE == "s" else 1e-3          # 学习率
     WEIGHT_DECAY = 5e-4         # 权重衰减（L2 正则），防止模型过拟合
-    count_loss_weight = 0.25    # 数量约束损失的权重
+    count_loss_weight = 0.1    # 数量约束损失的权重
 
     # ===================== 2. 数据预处理 =====================
     # 2.1 归一化和标准差
@@ -65,32 +73,45 @@ if __name__ == '__main__':
 
     # ===================== 3. 加载数据集 =====================
     print("=== 正在加载数据集 ===")
-    # 3.1 先创建一个临时数据集 仅用于计算长度和生成索引
-    temp_dataset = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=None)
-    dataset_size = len(temp_dataset)
-    val_size = int(VAL_RATIO * dataset_size)
-    train_size = dataset_size - val_size
+    if load_datasets:       # 直接加载数据集
+        print("直接加载数据集")
+        # 3.1 先创建一个临时数据集 仅用于计算长度和生成索引
+        temp_dataset = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=None)
+        dataset_size = len(temp_dataset)
+        val_size = int(VAL_RATIO * dataset_size)
+        train_size = dataset_size - val_size
 
-    # 3.2 生成随机且互斥的索引
-    # 注意：这里为了确保可复现性，可以固定一个seed，也可以不固定
-    indices = torch.randperm(dataset_size).tolist()
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
+        # 3.2 生成随机且互斥的索引
+        # 注意：这里为了确保可复现性，可以固定一个seed，也可以不固定
+        indices = torch.randperm(dataset_size).tolist()
+        train_indices = indices[:train_size]
+        val_indices = indices[train_size:]
 
-    # 3.3 实例化两个完全独立的 Dataset 对象
-    # 这样它们的 transform 互不干扰
-    train_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
-    val_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
+        # 3.3 实例化两个完全独立的 Dataset 对象
+        # 这样它们的 transform 互不干扰
+        train_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
+        val_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
 
-    # 3.4 使用 Subset 根据索引包装
-    train_dataset = Subset(train_dataset_full, train_indices)
-    val_dataset = Subset(val_dataset_full, val_indices)
+        # 3.4 使用 Subset 根据索引包装
+        train_dataset = Subset(train_dataset_full, train_indices)
+        val_dataset = Subset(val_dataset_full, val_indices)
 
-    # 3.5 创建 DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=False,
-                              drop_last=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=False,
-                            drop_last=True)
+        # 3.5 创建 DataLoader
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=False,
+                                  drop_last=True)
+        val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=False,
+                                drop_last=True)
+    else:       # 直接指定训练集和验证集
+        print("直接指定训练集和验证集")
+        train_dataset = ROI12ImageDataset(dataset_root=TRAIN_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
+        val_dataset = ROI12ImageDataset(dataset_root=VAL_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
+        train_size = len(train_dataset)
+        val_size = len(val_dataset)
+
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=False,
+                                  drop_last=True)
+        val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=False,
+                                drop_last=True)
 
     print(f"=== 数据集划分完成 ===")
     print(f"训练集：{train_size}样本 | {len(train_loader)}批次")

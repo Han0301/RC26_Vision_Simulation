@@ -15,8 +15,8 @@ class YOLO11ROIInferencer:
     def __init__(self, model_path, dataset_root=None, model_size="s", roi_size=64, num_roi=12, num_classes=2):
         """初始化推理器"""
         # 设备配置
-        self.device = torch.device("cpu")
-        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # 核心参数
         self.model_size = model_size
@@ -109,7 +109,7 @@ class YOLO11ROIInferencer:
             if idx_num in roi_file_dict:
                 roi_path = roi_file_dict[idx_num]
                 roi_filename = os.path.basename(roi_path)
-                # 读取图片（容错：无法读取则用全黑图）
+                # 读取图片（容错：无法读取则用全黑图替代）
                 roi_img = cv2.imread(roi_path)
                 if roi_img is None:
                     print(f"⚠️ ROI文件无法读取：{roi_path}，使用全黑图替代")
@@ -271,10 +271,8 @@ class YOLO11ROIInferencer:
 
     def batch_infer_with_multi_thresholds(self, img_idx_list, conf_thresholds=[0.6, 0.7, 0.8],
                                           error_log_path="infer_error_log.txt"):
-        """原有逻辑：多阈值批量推理"""
+        """原有逻辑：多阈值批量推理 + 新增分类准确率统计 + 新增分类高置信占总预测数比重"""
         # 校验阈值合法性
-        if len(conf_thresholds) != 3:
-            raise ValueError(f"请传入3个置信度阈值！当前数量：{len(conf_thresholds)}")
         for th in conf_thresholds:
             if not (0.0 <= th <= 1.0):
                 raise ValueError(f"置信度阈值必须在0-1之间！当前值：{th}")
@@ -284,14 +282,32 @@ class YOLO11ROIInferencer:
         total_correct = 0  # 总正确数
         error_records = []  # 错误记录
 
+        # ========== 核心新增1：全局预测类别总数（不管置信度） ==========
+        pred_cls0_total = 0  # 所有预测为0类的ROI总数
+        pred_cls1_total = 0  # 所有预测为1类的ROI总数
+
+        # ========== 核心修改1：扩展阈值统计结构，增加分类统计 ==========
         # 初始化多阈值统计字典（每个阈值对应一套指标）
         threshold_stats = {}
         for th in conf_thresholds:
             threshold_stats[th] = {
                 "high_conf_roi": 0,  # 该阈值下高置信度ROI数
                 "high_conf_correct": 0,  # 该阈值下高置信度且正确的ROI数
-                "high_conf_ratio": 0.0,  # 该阈值下高置信度占比
-                "high_conf_accuracy": 0.0  # 该阈值下高置信度准确率
+                "high_conf_ratio": 0.0,  # 该阈值下高置信度占比（占总ROI）
+                "high_conf_accuracy": 0.0,  # 该阈值下高置信度准确率
+                # 新增：按预测类别拆分的高置信度统计
+                "cls0": {  # 预测为0类（无方块）
+                    "high_conf_roi": 0,  # 预测0类且高置信的ROI数
+                    "high_conf_correct": 0,  # 预测0类且高置信且正确的ROI数
+                    "high_conf_accuracy": 0.0,  # 预测0类且高置信的准确率
+                    "high_conf_ratio_of_total_cls0": 0.0  # 新增：高置信0类数占所有预测0类数的比重
+                },
+                "cls1": {  # 预测为1类（有方块）
+                    "high_conf_roi": 0,  # 预测1类且高置信的ROI数
+                    "high_conf_correct": 0,  # 预测1类且高置信且正确的ROI数
+                    "high_conf_accuracy": 0.0,  # 预测1类且高置信的准确率
+                    "high_conf_ratio_of_total_cls1": 0.0  # 新增：高置信1类数占所有预测1类数的比重
+                }
             }
 
         # 清空日志
@@ -314,17 +330,38 @@ class YOLO11ROIInferencer:
                     pred_cls = raw_results["pred_cls"][i]
                     pred_conf = raw_results["pred_conf"][i]
 
+                    # ========== 核心新增2：统计全局预测类别总数 ==========
+                    if pred_cls == 0:
+                        pred_cls0_total += 1
+                    elif pred_cls == 1:
+                        pred_cls1_total += 1
+
                     # 判断是否正确
                     is_correct = (pred_cls == gt_label)
+
                     if is_correct:
                         total_correct += 1
 
+                    # ========== 核心修改2：更新分类高置信度统计 ==========
                     # 对每个阈值单独统计高置信度指标
                     for th in conf_thresholds:
                         if pred_conf >= th:
+                            # 更新整体高置信统计
                             threshold_stats[th]["high_conf_roi"] += 1
                             if is_correct:
                                 threshold_stats[th]["high_conf_correct"] += 1
+
+                            # 更新按预测类别拆分的高置信统计
+                            if pred_cls == 0:
+                                # 预测为0类（无方块）
+                                threshold_stats[th]["cls0"]["high_conf_roi"] += 1
+                                if is_correct:
+                                    threshold_stats[th]["cls0"]["high_conf_correct"] += 1
+                            elif pred_cls == 1:
+                                # 预测为1类（有方块）
+                                threshold_stats[th]["cls1"]["high_conf_roi"] += 1
+                                if is_correct:
+                                    threshold_stats[th]["cls1"]["high_conf_correct"] += 1
 
                     # 记录错误ROI
                     if not is_correct:
@@ -344,15 +381,30 @@ class YOLO11ROIInferencer:
                 with open(error_log_path, "a", encoding="utf-8") as f:
                     f.write(f"【样本 {img_idx}】推理失败：{str(e)}\n\n")
 
-        # 计算整体指标
-        overall_accuracy = total_correct / total_roi if total_roi > 0 else 0.0
-
+        # ========== 核心修改3：计算分类准确率 + 新增分类高置信占总预测数比重 ==========
         # 计算每个阈值的占比和准确率
         for th in conf_thresholds:
             stats = threshold_stats[th]
+            # 整体指标计算
             stats["high_conf_ratio"] = stats["high_conf_roi"] / total_roi if total_roi > 0 else 0.0
             stats["high_conf_accuracy"] = stats["high_conf_correct"] / stats["high_conf_roi"] if stats[
                                                                                                      "high_conf_roi"] > 0 else 0.0
+
+            # 分类指标计算（0类）
+            cls0_stats = stats["cls0"]
+            cls0_stats["high_conf_accuracy"] = cls0_stats["high_conf_correct"] / cls0_stats["high_conf_roi"] if \
+                cls0_stats["high_conf_roi"] > 0 else 0.0
+            # 新增：0类高置信数占所有预测0类数的比重
+            cls0_stats["high_conf_ratio_of_total_cls0"] = cls0_stats[
+                                                              "high_conf_roi"] / pred_cls0_total if pred_cls0_total > 0 else 0.0
+
+            # 分类指标计算（1类）
+            cls1_stats = stats["cls1"]
+            cls1_stats["high_conf_accuracy"] = cls1_stats["high_conf_correct"] / cls1_stats["high_conf_roi"] if \
+                cls1_stats["high_conf_roi"] > 0 else 0.0
+            # 新增：1类高置信数占所有预测1类数的比重
+            cls1_stats["high_conf_ratio_of_total_cls1"] = cls1_stats[
+                                                              "high_conf_roi"] / pred_cls1_total if pred_cls1_total > 0 else 0.0
 
         # 写入日志
         with open(error_log_path, "a", encoding="utf-8") as f:
@@ -361,33 +413,74 @@ class YOLO11ROIInferencer:
             f.write(f"总推理样本数：{len(img_idx_list)}\n")
             f.write(f"总ROI数：{total_roi}\n")
             f.write(f"总正确数：{total_correct}\n")
-            f.write(f"整体准确率：{overall_accuracy:.4f} ({total_correct}/{total_roi})\n")
-            f.write(f"错误ROI总数：{len(error_records)}\n\n")
+            f.write(f"整体准确率：{total_correct / total_roi:.4f} ({total_correct}/{total_roi})\n")
+            f.write(f"错误ROI总数：{len(error_records)}\n")
+            # ========== 核心新增3：日志中添加全局预测类别总数 ==========
+            f.write(f"全局预测0类（无方块）总数：{pred_cls0_total}\n")
+            f.write(f"全局预测1类（有方块）总数：{pred_cls1_total}\n\n")
 
+            # ========== 核心修改4：日志中添加分类统计 ==========
             f.write("=== 各置信度阈值统计结果 ===\n")
             for th in conf_thresholds:
                 stats = threshold_stats[th]
+                cls0_stats = stats["cls0"]
+                cls1_stats = stats["cls1"]
                 f.write(f"\n【阈值 {th}】\n")
-                f.write(f"  - 高置信度ROI数：{stats['high_conf_roi']}\n")
-                f.write(f"  - 高置信度正确数：{stats['high_conf_correct']}\n")
-                f.write(f"  - 高置信度占比：{stats['high_conf_ratio']:.4f} ({stats['high_conf_roi']}/{total_roi})\n")
+                # 整体指标
+                f.write(f"  ├─ 整体高置信指标 ───────────────────\n")
+                f.write(f"  │ 高置信度ROI数：{stats['high_conf_roi']}\n")
+                f.write(f"  │ 高置信度正确数：{stats['high_conf_correct']}\n")
                 f.write(
-                    f"  - 高置信度准确率：{stats['high_conf_accuracy']:.4f} ({stats['high_conf_correct']}/{stats['high_conf_roi']})\n")
+                    f"  │ 高置信度占比（总ROI）：{stats['high_conf_ratio']:.4f} ({stats['high_conf_roi']}/{total_roi})\n")
+                f.write(
+                    f"  │ 高置信度准确率：{stats['high_conf_accuracy']:.4f} ({stats['high_conf_correct']}/{stats['high_conf_roi']})\n")
+                # 0类指标
+                f.write(f"  ├─ 预测为0类（无方块）高置信指标 ──────\n")
+                f.write(f"  │ 高置信度ROI数：{cls0_stats['high_conf_roi']}\n")
+                f.write(f"  │ 高置信度正确数：{cls0_stats['high_conf_correct']}\n")
+                f.write(
+                    f"  │ 高置信度准确率：{cls0_stats['high_conf_accuracy']:.4f} ({cls0_stats['high_conf_correct']}/{cls0_stats['high_conf_roi']})\n")
+                # 新增：0类高置信占其总预测数的比重
+                f.write(
+                    f"  │ 高置信占总预测0类比重：{cls0_stats['high_conf_ratio_of_total_cls0']:.4f} ({cls0_stats['high_conf_roi']}/{pred_cls0_total})\n")
+                # 1类指标
+                f.write(f"  ├─ 预测为1类（有方块）高置信指标 ──────\n")
+                f.write(f"  │ 高置信度ROI数：{cls1_stats['high_conf_roi']}\n")
+                f.write(f"  │ 高置信度正确数：{cls1_stats['high_conf_correct']}\n")
+                f.write(
+                    f"  │ 高置信度准确率：{cls1_stats['high_conf_accuracy']:.4f} ({cls1_stats['high_conf_correct']}/{cls1_stats['high_conf_roi']})\n")
+                # 新增：1类高置信占其总预测数的比重
+                f.write(
+                    f"  │ 高置信占总预测1类比重：{cls1_stats['high_conf_ratio_of_total_cls1']:.4f} ({cls1_stats['high_conf_roi']}/{pred_cls1_total})\n")
 
         # 控制台打印汇总结果
         print(f"\n" + "=" * 80)
         print(f"=== 批量推理多阈值统计汇总 ===")
         print(f"├─ 全局指标 ──────────────────────────────────────────────────────")
         print(f"│ 总样本数：{len(img_idx_list)} | 总ROI数：{total_roi} | 总正确数：{total_correct}")
-        print(f"│ 整体准确率：{overall_accuracy:.4f} ({total_correct}/{total_roi})")
+        print(f"│ 整体准确率：{total_correct / total_roi:.4f} ({total_correct}/{total_roi})")
+        print(f"│ 全局预测0类总数：{pred_cls0_total} | 全局预测1类总数：{pred_cls1_total}")
         print(f"├─ 错误ROI总数：{len(error_records)}")
-        print(f"├─ 各阈值高置信度指标对比 ────────────────────────────────────────")
+
+        # ========== 核心修改5：控制台打印分类统计 ==========
+        print(f"├─ 各阈值高置信度整体指标对比 ────────────────────────────────────")
         print(f"│ 阈值   | 高置信ROI数 | 高置信正确数 | 高置信占比  | 高置信准确率")
         print(f"│--------|-------------|--------------|-------------|-------------")
         for th in conf_thresholds:
             stats = threshold_stats[th]
             print(
-                f"│ {th:6.1f} | {stats['high_conf_roi']:11d} | {stats['high_conf_correct']:12d} | {stats['high_conf_ratio']:11.4f} | {stats['high_conf_accuracy']:11.4f}")
+                f"│ {th:6.2f} | {stats['high_conf_roi']:11d} | {stats['high_conf_correct']:12d} | {stats['high_conf_ratio']:11.4f} | {stats['high_conf_accuracy']:11.4f}")
+
+        # 新增：打印按预测类别拆分的高置信度准确率 + 占总预测数比重
+        print(f"├─ 各阈值高置信度分类指标对比 ────────────────────────────────────")
+        print(f"│ 阈值   | 0类高置信数 | 0类准确率   | 0类高置信占比 | 1类高置信数 | 1类准确率   | 1类高置信占比 ")
+        print(f"│--------|-------------|-------------|---------------|-------------|-------------|---------------")
+        for th in conf_thresholds:
+            stats = threshold_stats[th]
+            cls0 = stats["cls0"]
+            cls1 = stats["cls1"]
+            print(
+                f"│ {th:6.2f} | {cls0['high_conf_roi']:11d} | {cls0['high_conf_accuracy']:11.4f} | {cls0['high_conf_ratio_of_total_cls0']:13.4f} | {cls1['high_conf_roi']:11d} | {cls1['high_conf_accuracy']:11.4f} | {cls1['high_conf_ratio_of_total_cls1']:13.4f}")
         print(f"└─────────────────────────────────────────────────────────────────")
         print(f"\n✅ 错误日志已保存至：{error_log_path}")
 
@@ -397,8 +490,10 @@ class YOLO11ROIInferencer:
                 "total_samples": len(img_idx_list),
                 "total_roi": total_roi,
                 "total_correct": total_correct,
-                "overall_accuracy": overall_accuracy,
-                "error_roi_count": len(error_records)
+                "overall_accuracy": total_correct / total_roi if total_roi > 0 else 0.0,
+                "error_roi_count": len(error_records),
+                "pred_cls0_total": pred_cls0_total,  # 新增：全局预测0类总数
+                "pred_cls1_total": pred_cls1_total  # 新增：全局预测1类总数
             },
             "thresholds": threshold_stats,
             "conf_thresholds": conf_thresholds
@@ -410,7 +505,7 @@ class YOLO11ROIInferencer:
 # 测试入口
 if __name__ == "__main__":
     # 核心配置
-    MODEL_PATH = r"H:\xwechat_files\wxid_tbck6dmx91tx22_8336\msg\file\2026-03\zb_yolo11_s_best.pt"
+    MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj1\yolo11_Custom_12roi_2\model_pt\yolo11sroi_best_cls2_2.pt"
     MODEL_SIZE = "s"
     ROI_SIZE = 64
 
@@ -418,8 +513,6 @@ if __name__ == "__main__":
     RUN_FOLDER_INFER = False  # 文件夹直接推理模式
     RUN_BATCH_INFER = True  # 原有批量多阈值推理模式
 
-    # RUN_FOLDER_INFER = True  # 文件夹直接推理模式
-    # RUN_BATCH_INFER = False  # 原有批量多阈值推理模式
     # 初始化推理器（无需dataset_root，仅加载模型）
     inferencer = YOLO11ROIInferencer(
         model_path=MODEL_PATH,
@@ -446,8 +539,8 @@ if __name__ == "__main__":
 
     # ===================== 2. 原有批量多阈值推理模式（可选） =====================
     if RUN_BATCH_INFER:
-        CONF_THRESHOLDS = [0.8, 0.85, 0.90]
-        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\test_map50"
+        CONF_THRESHOLDS = [0.6,0.65,0.7, 0.75, 0.80, 0.85, 0.90, 0.95]
+        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"
         # 重新初始化推理器（需要dataset_root）
         inferencer_batch = YOLO11ROIInferencer(
             model_path=MODEL_PATH,
@@ -458,7 +551,8 @@ if __name__ == "__main__":
             num_classes=2
         )
         # 批量推理样本列表
-        BATCH_TEST_IDXS = [i for i in range(1, 4755)]  # 前100个样本测试
+        # BATCH_TEST_IDXS = [i for i in range(1, 4755)]  # 前100个样本测试
+        BATCH_TEST_IDXS = [i for i in range(1, 2667)]
         # 执行批量推理
         batch_stats = inferencer_batch.batch_infer_with_multi_thresholds(
             img_idx_list=BATCH_TEST_IDXS,

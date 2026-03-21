@@ -3,6 +3,7 @@ import cv2
 import json
 import numpy as np
 import torch
+import traceback  # 用于打印详细堆栈信息
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -56,6 +57,7 @@ def group_separation_loss(values, idx_A, alpha=1.0, beta=0.1, eps=1e-8):
         "inter_loss": inter_loss
     }
 
+
 # ===================== 核心后处理函数（完全对齐训练版本） =====================
 def post_process_prob(prob, last_low_indices=None, max_empty=4, history_probs=None):
     """
@@ -106,7 +108,6 @@ def post_process_prob(prob, last_low_indices=None, max_empty=4, history_probs=No
         # 1. 计算加权概率（权重=轮数：第1轮权重1，第2轮权重2...）
         weights = np.array([i + 1 for i in range(len(all_probs))])  # 轮数作为权重
         weighted_prob = np.average(np.array(all_probs), axis=0, weights=weights)
-        print(f"weighted_prob: {weighted_prob}")
         # 2. 确定当前轮数n和置空数量
         n = current_round  # 2/3/4
         empty_num = n + 1  # 第二轮取3个，第三轮取4个，第四轮取5个（但最多4个）
@@ -126,16 +127,6 @@ def post_process_prob(prob, last_low_indices=None, max_empty=4, history_probs=No
         # 5. 收敛条件：第四轮强制收敛，确保循环在第4轮结束
         is_converged = True if current_round == 4 else False
         result = group_separation_loss(weighted_prob, current_low_indices, alpha=1.0, beta=0.1)
-        # 打印结果
-        print("==== 组分离损失计算结果 ====")
-        print(f"总损失 L: {result['total_loss']:.6f}")
-        print(f"类0）均值 μₐ: {result['mu_A']:.6f}")
-        print(f"类1  均值 μᵦ: {result['mu_B']:.6f}")
-        print(f"组间均值差 Δμ: {result['delta_mu']:.6f}")
-        print(f"类A方差 σₐ²: {result['var_A']:.8f}")
-        print(f"类B方差 σᵦ²: {result['var_B']:.8f}")
-        print(f"组内一致性损失: {result['intra_loss']:.6f}")
-        print(f"组间背离损失: {result['inter_loss']:.6f}")
 
     # 4. 生成新的exist_boxes（置空对应位置）
     exist_boxes_new = np.ones(12, dtype=int)
@@ -143,6 +134,7 @@ def post_process_prob(prob, last_low_indices=None, max_empty=4, history_probs=No
 
     # ===================== 返回值完全不变 =====================
     return exist_boxes_new, is_converged, current_low_indices, k, prob_hist_mean, prob_hist_std, global_low_quantile, low_prob_indices
+
 
 # ===================== ROI预处理函数（完全对齐训练版本） =====================
 def preprocess_roi_images(roi_imgs, roi_img_size=64, transform=None):
@@ -175,6 +167,10 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
     prob_history = []
     cycle_details = []
 
+    # 新增：单样本位置正确率统计
+    pos_correct_single = [0] * 12
+    pos_total_single = [0] * 12
+
     model.eval()
     print("\n" + "=" * 80)
     print(f"开始单样本循环推理（最大{max_cycles}轮）")
@@ -199,6 +195,13 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
             metrics = calculate_2c_metrics(pred_logits, label_tensor)
             acc_list.append(metrics["total_acc"])  # 正确访问总准确率
             f1_list.append(metrics["pos_metrics"]["f1"])  # 正确访问正样本F1
+
+            # 新增：统计本轮每个位置的预测结果
+            pred_cls = torch.argmax(pred_logits, dim=-1).squeeze(0).cpu().numpy()
+            for pos_idx in range(12):
+                pos_total_single[pos_idx] += 1
+                if pred_cls[pos_idx] == label_np[pos_idx]:
+                    pos_correct_single[pos_idx] += 1
 
             # 4. 打印本轮概率信息
             print(f"本轮各位置概率: {[f'{p:.4f}' for p in pred_prob]}")
@@ -231,7 +234,9 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
                 "k": k,
                 "is_converged": is_converged,
                 "acc": metrics["total_acc"],
-                "f1": metrics["pos_metrics"]["f1"]
+                "f1": metrics["pos_metrics"]["f1"],
+                # 新增：本轮位置预测结果
+                "pos_pred_cls": pred_cls.tolist()
             })
 
             # 8. 收敛/最大轮数判断（和训练一致）
@@ -252,13 +257,25 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
     else:
         final_prob = prob_history[0] if prob_history else pred_prob
 
-    # 11. 生成最终exist_boxes（和训练一致）
-    final_exist, _, _, _, _, _, _, _ = post_process_prob(final_prob, max_empty=4, history_probs=prob_history)
+    # 11. 修复：将最终概率转为正确的二分类logits
+    final_prob = np.clip(final_prob, 1e-6, 1 - 1e-6)
+    neg_logits = np.log(1 - final_prob)
+    pos_logits = np.log(final_prob)
+    final_logits = np.stack([neg_logits, pos_logits], axis=-1)
+    pred_logits_final = torch.tensor(final_logits).unsqueeze(0).to(device)
 
     # 12. 计算最终指标（和训练一致）
-    pred_logits_final = torch.tensor(final_prob).unsqueeze(0).unsqueeze(-1).to(device)
     label_tensor = torch.from_numpy(label_np).unsqueeze(0).to(device)
     final_metrics = calculate_2c_metrics(pred_logits_final, label_tensor)
+
+    # 新增：计算单样本各位置正确率
+    pos_acc_single = [pos_correct_single[i] / (pos_total_single[i] + 1e-6) for i in range(12)]
+    print("\n" + "=" * 80)
+    print("单样本各位置正确率统计（多轮平均）")
+    print("=" * 80)
+    for pos_idx in range(12):
+        print(
+            f"位置{pos_idx + 1:2d} | 总预测次数: {pos_total_single[pos_idx]} | 正确次数: {pos_correct_single[pos_idx]} | 正确率: {pos_acc_single[pos_idx]:.4f}")
 
     # 13. 打印最终结果
     print("\n" + "=" * 80)
@@ -266,7 +283,7 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
     print("=" * 80)
     print(f"实际标签: {label_np.tolist()}")
     print(f"最终概率: {[f'{p:.4f}' for p in final_prob]}")
-    print(f"最终exist_boxes: {final_exist.tolist()}")
+    print(f"最终exist_boxes: {exist_boxes_new.tolist()}")
     print(f"实际循环轮数: {cycle_num + 1}")
     print(f"平均每轮准确率: {np.mean(acc_list):.4f}" if acc_list else "无")
     print(f"平均每轮F1: {np.mean(f1_list):.4f}" if f1_list else "无")
@@ -284,19 +301,33 @@ def infer_single_sample_verbose(global_img_np, label_np, rvec, tvec, model, tran
         "avg_acc_per_cycle": np.mean(acc_list) if acc_list else 0.0,
         "avg_f1_per_cycle": np.mean(f1_list) if f1_list else 0.0,
         "cycle_num": cycle_num + 1,
-        "cycle_details": cycle_details
+        "cycle_details": cycle_details,
+        "final_prob": final_prob.tolist(),
+        "label": label_np.tolist(),
+        # 新增：位置级统计
+        "pos_correct": pos_correct_single,
+        "pos_total": pos_total_single,
+        "pos_acc": pos_acc_single
     }
 
-    return final_prob, final_exist, cycle_num + 1, metrics_dict
+    return final_prob, exist_boxes_new, cycle_num + 1, metrics_dict
 
 
-# ===================== 数据集批量推理函数（完全对齐训练逻辑） =====================
+# ===================== 数据集批量推理函数（含运行时+逻辑异常捕获） =====================
 def infer_dataset(dataset_root, model_path, model_size="s", roi_img_size=64,
                   max_cycles=7, batch_size=8, device="cuda"):
     """
-    数据集批量推理：核心逻辑100%对齐训练的evaluate函数
-    统计指标和训练保持一致
+    数据集批量推理：
+    1. 捕获运行时异常样本（代码报错）
+    2. 捕获逻辑异常样本（准确率/F1异常）
+    3. 即时打印异常信息，最终汇总所有异常
+    4. 新增：统计12个位置各自的正确率
     """
+    # 逻辑异常判断阈值（可自定义）
+    ACC_THRESHOLD = 0.5  # 总准确率低于该值判定为异常
+    F1_THRESHOLD = 0.1  # 正样本F1低于该值判定为异常
+    PROB_NAN_THRESHOLD = True  # 概率含NaN/Inf判定为异常
+
     # 1. 数据预处理（完全对齐训练的val_transform）
     yolo11_mean = [0.485, 0.456, 0.406]
     yolo11_std = [0.229, 0.224, 0.225]
@@ -312,7 +343,7 @@ def infer_dataset(dataset_root, model_path, model_size="s", roi_img_size=64,
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4 if device == "cuda" else 0,  # 对齐训练的num_workers
+        num_workers=4 if device == "cuda" else 0,
         pin_memory=True if device == "cuda" else False
     )
     print(f"\n加载数据集: {dataset_root} | 样本总数: {len(dataset)}")
@@ -326,7 +357,7 @@ def infer_dataset(dataset_root, model_path, model_size="s", roi_img_size=64,
     ).to(device)
 
     # 兼容训练的checkpoint格式（含model_state_dict）
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
@@ -334,7 +365,7 @@ def infer_dataset(dataset_root, model_path, model_size="s", roi_img_size=64,
     model.eval()
     print(f"加载模型: {model_path} | 模型尺寸: {model_size}")
 
-    # 4. 初始化统计变量（完全对齐训练的evaluate函数）
+    # 4. 初始化统计变量
     total_samples = 0
     cycle_num_list = []
     is_converged_list = []
@@ -345,146 +376,322 @@ def infer_dataset(dataset_root, model_path, model_size="s", roi_img_size=64,
     per_cycle_acc = []
     per_cycle_f1 = []
 
-    print("\n开始数据集批量推理（完全对齐训练逻辑）...")
+    # 新增：位置级统计变量（核心修改）
+    pos_total = [0] * 12  # 每个位置的总预测次数（所有样本+所有轮次）
+    pos_correct = [0] * 12  # 每个位置的正确预测次数
+    pos_sample_total = [0] * 12  # 每个位置的总样本数（仅最终预测）
+    pos_sample_correct = [0] * 12  # 每个位置最终预测的正确数
+
+    # 异常记录变量
+    runtime_error_records = []  # 运行时异常（代码报错）
+    logic_error_records = []  # 逻辑异常（结果异常）
+    total_runtime_errors = 0  # 运行时异常样本数
+    total_logic_errors = 0  # 逻辑异常样本数
+
+    print("\n开始数据集批量推理（含异常监控+位置正确率统计）...")
     pbar = tqdm(total=len(dataloader), desc="推理进度")
 
     with torch.no_grad():
-        for batch_data in dataloader:
+        for batch_idx, batch_data in enumerate(dataloader):
             global_imgs = batch_data["global_img"]
             labels = batch_data["labels"].to(device)
             rvecs = batch_data["rvec"]
             tvecs = batch_data["tvec"]
 
             for b in range(global_imgs.shape[0]):
-                # 恢复原始图像（和训练一致的反归一化）
-                global_img_tensor = global_imgs[b].cpu()
-                global_img_np = (global_img_tensor.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
-                rvec = rvecs[b].cpu().numpy()
-                tvec = tvecs[b].cpu().numpy()
-                label_np = labels[b].cpu().numpy()
-                label_tensor = labels[b].unsqueeze(0).to(device)
+                sample_idx = batch_idx * batch_size + b  # 全局样本索引
+                try:
+                    # -------------------- 样本推理核心逻辑 --------------------
+                    # 恢复原始图像（和训练一致的反归一化）
+                    global_img_tensor = global_imgs[b].cpu()
+                    global_img_np = (global_img_tensor.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
+                    rvec = rvecs[b].cpu().numpy()
+                    tvec = tvecs[b].cpu().numpy()
+                    label_np = labels[b].cpu().numpy()
+                    label_tensor = labels[b].unsqueeze(0).to(device)
 
-                # 单样本循环推理（完全对齐训练的infer_single_sample）
-                exist_boxes = np.ones(12, dtype=int)
-                last_low_indices = None
-                cycle_num = 0
-                f1_list = []
-                acc_list = []
-                prob_history = []
+                    # 单样本循环推理
+                    exist_boxes = np.ones(12, dtype=int)
+                    last_low_indices = None
+                    cycle_num = 0
+                    f1_list = []
+                    acc_list = []
+                    prob_history = []
+                    pos_correct_sample = [0] * 12  # 该样本各位置正确数（多轮）
+                    pos_total_sample = [0] * 12  # 该样本各位置总次数（多轮）
 
-                while cycle_num < max_cycles:
-                    # 1. 生成ROI（和训练一致）
-                    roi_imgs = process_zbuffer_with_rt(global_img_np, rvec, tvec, exist_boxes.tolist())
-                    roi_tensor = preprocess_roi_images(roi_imgs, roi_img_size, val_transform).to(device)
+                    while cycle_num < max_cycles:
+                        # 1. 生成ROI
+                        roi_imgs = process_zbuffer_with_rt(global_img_np, rvec, tvec, exist_boxes.tolist())
+                        roi_tensor = preprocess_roi_images(roi_imgs, roi_img_size, val_transform).to(device)
 
-                    # 2. 模型推理（和训练一致）
-                    pred_logits = model(roi_tensor)
-                    pred_prob = torch.softmax(pred_logits, dim=-1)[0, :, 1].cpu().numpy()
-                    prob_history.append(pred_prob)
+                        # 2. 模型推理
+                        pred_logits = model(roi_tensor)
+                        pred_prob = torch.softmax(pred_logits, dim=-1)[0, :, 1].cpu().numpy()
+                        prob_history.append(pred_prob)
 
-                    # 3. 计算本轮指标（匹配calculate_2c_metrics返回结构）
-                    metrics = calculate_2c_metrics(pred_logits, label_tensor)
-                    acc_list.append(metrics["total_acc"])
-                    f1_list.append(metrics["pos_metrics"]["f1"])
+                        # 3. 计算本轮指标
+                        metrics = calculate_2c_metrics(pred_logits, label_tensor)
+                        acc_list.append(metrics["total_acc"])
+                        f1_list.append(metrics["pos_metrics"]["f1"])
 
-                    # 4. 后处理（完全对齐训练）
-                    exist_boxes_new, is_converged, current_low_indices, _, _, _, _, _ = post_process_prob(
-                        pred_prob, last_low_indices, max_empty=4, history_probs=prob_history[:-1]
-                    )
+                        # 新增：更新该样本本轮位置统计
+                        pred_cls = torch.argmax(pred_logits, dim=-1).squeeze(0).cpu().numpy()
+                        for pos_idx in range(12):
+                            pos_total_sample[pos_idx] += 1
+                            pos_total[pos_idx] += 1  # 全局位置总次数
+                            if pred_cls[pos_idx] == label_np[pos_idx]:
+                                pos_correct_sample[pos_idx] += 1
+                                pos_correct[pos_idx] += 1  # 全局位置正确数
 
-                    # 5. 收敛判断（和训练一致）
-                    if is_converged or cycle_num >= max_cycles - 1:
-                        break
+                        # 4. 后处理
+                        exist_boxes_new, is_converged, current_low_indices, _, _, _, _, _ = post_process_prob(
+                            pred_prob, last_low_indices, max_empty=4, history_probs=prob_history[:-1]
+                        )
 
-                    # 6. 更新状态（和训练一致）
-                    exist_boxes = exist_boxes_new
-                    last_low_indices = current_low_indices
-                    cycle_num += 1
+                        # 5. 收敛判断
+                        if is_converged or cycle_num >= max_cycles - 1:
+                            break
 
-                # 7. 统计样本级指标（和训练一致）
-                actual_cycle = cycle_num + 1
-                cycle_num_list.append(actual_cycle)
-                is_converged_list.append(is_converged)
-                avg_acc_per_cycle = np.mean(acc_list) if acc_list else 0.0
-                avg_f1 = np.mean(f1_list) if f1_list else 0.0
-                avg_acc_per_cycle_list.append(avg_acc_per_cycle)
-                avg_f1_list.append(avg_f1)
+                        # 6. 更新状态
+                        exist_boxes = exist_boxes_new
+                        last_low_indices = current_low_indices
+                        cycle_num += 1
 
-                # 8. 综合最终概率（和训练一致）
-                if len(prob_history) > 1:
-                    weights = np.linspace(0.1, 1.0, len(prob_history))
-                    weights = weights / weights.sum()
-                    final_prob = np.average(prob_history, axis=0, weights=weights)
-                else:
-                    final_prob = prob_history[0] if prob_history else pred_prob
+                    # -------------------- 统计样本指标 --------------------
+                    actual_cycle = cycle_num + 1
+                    cycle_num_list.append(actual_cycle)
+                    is_converged_list.append(is_converged)
+                    avg_acc_per_cycle = np.mean(acc_list) if acc_list else 0.0
+                    avg_f1 = np.mean(f1_list) if f1_list else 0.0
+                    avg_acc_per_cycle_list.append(avg_acc_per_cycle)
+                    avg_f1_list.append(avg_f1)
 
-                # 9. 计算最终指标（和训练一致）
-                pred_logits_final = torch.tensor(final_prob).unsqueeze(0).unsqueeze(-1).to(device)
-                final_metrics = calculate_2c_metrics(pred_logits_final, label_tensor)
-                final_acc_list.append(final_metrics["total_acc"])
-                final_f1_list.append(final_metrics["pos_metrics"]["f1"])
+                    # -------------------- 修复：最终概率转logits --------------------
+                    if len(prob_history) > 1:
+                        weights = np.linspace(0.1, 1.0, len(prob_history))
+                        weights = weights / weights.sum()
+                        final_prob = np.average(prob_history, axis=0, weights=weights)
+                    else:
+                        final_prob = prob_history[0] if prob_history else pred_prob
 
-                # 10. 收集每轮指标（和训练一致）
-                for cycle_idx in range(len(acc_list)):
-                    if cycle_idx >= len(per_cycle_acc):
-                        per_cycle_acc.append([])
-                        per_cycle_f1.append([])
-                    per_cycle_acc[cycle_idx].append(acc_list[cycle_idx])
-                    per_cycle_f1[cycle_idx].append(f1_list[cycle_idx])
+                    # 转为正确的二分类logits
+                    final_prob = np.clip(final_prob, 1e-6, 1 - 1e-6)
+                    neg_logits = np.log(1 - final_prob)
+                    pos_logits = np.log(final_prob)
+                    final_logits = np.stack([neg_logits, pos_logits], axis=-1)
+                    pred_logits_final = torch.tensor(final_logits).unsqueeze(0).to(device)
 
-                total_samples += 1
+                    # -------------------- 计算最终指标 --------------------
+                    final_metrics = calculate_2c_metrics(pred_logits_final, label_tensor)
+                    final_acc = final_metrics["total_acc"]
+                    final_pos_f1 = final_metrics["pos_metrics"]["f1"]
+                    final_acc_list.append(final_acc)
+                    final_f1_list.append(final_pos_f1)
+
+                    # 新增：更新最终预测的位置统计（仅最终一轮）
+                    final_pred_cls = torch.argmax(pred_logits_final, dim=-1).squeeze(0).cpu().numpy()
+                    for pos_idx in range(12):
+                        pos_sample_total[pos_idx] += 1
+                        if final_pred_cls[pos_idx] == label_np[pos_idx]:
+                            pos_sample_correct[pos_idx] += 1
+
+                    # -------------------- 收集每轮指标 --------------------
+                    for cycle_idx in range(len(acc_list)):
+                        if cycle_idx >= len(per_cycle_acc):
+                            per_cycle_acc.append([])
+                            per_cycle_f1.append([])
+                        per_cycle_acc[cycle_idx].append(acc_list[cycle_idx])
+                        per_cycle_f1[cycle_idx].append(f1_list[cycle_idx])
+
+                    # -------------------- 逻辑异常判断 & 即时打印 --------------------
+                    logic_error = False
+                    error_reasons = []
+                    # 条件1：总准确率低于阈值
+                    if final_acc < ACC_THRESHOLD:
+                        logic_error = True
+                        error_reasons.append(f"最终总准确率 {final_acc:.4f} < 阈值 {ACC_THRESHOLD}")
+                    # 条件2：正样本F1低于阈值
+                    if final_pos_f1 < F1_THRESHOLD:
+                        logic_error = True
+                        error_reasons.append(f"正样本F1 {final_pos_f1:.4f} < 阈值 {F1_THRESHOLD}")
+                    # 条件3：概率含NaN/Inf
+                    if np.any(np.isnan(final_prob)) or np.any(np.isinf(final_prob)):
+                        logic_error = True
+                        error_reasons.append("最终概率包含NaN/Inf异常值")
+                    # 条件4：收敛轮数异常（非4轮）
+                    if actual_cycle != 4:
+                        logic_error = True
+                        error_reasons.append(f"收敛轮数 {actual_cycle} 异常（预期4轮）")
+
+                    # 触发逻辑异常：即时打印+记录
+                    if logic_error:
+                        total_logic_errors += 1
+                        logic_error_info = {
+                            "sample_idx": sample_idx,
+                            "batch_idx": batch_idx,
+                            "batch_sample_idx": b,
+                            "error_reasons": error_reasons,
+                            "final_acc": final_acc,
+                            "final_pos_f1": final_pos_f1,
+                            "converge_cycles": actual_cycle,
+                            "label": label_np.tolist(),
+                            "final_prob": final_prob.tolist(),
+                            # 新增：该样本位置预测结果
+                            "final_pos_pred": final_pred_cls.tolist()
+                        }
+                        logic_error_records.append(logic_error_info)
+
+                        # 即时打印逻辑异常信息（黄色标注）
+                        print("\n" + "=" * 100)
+                        print(f"⚠️  【样本逻辑异常】- 全局样本索引: {sample_idx}")
+                        print("=" * 100)
+                        print(f"📌 错误位置：批次 {batch_idx} | 批次内样本 {b}")
+                        print(f"🔍 异常原因：{'; '.join(error_reasons)}")
+                        print(f"📝 样本标签: {label_np.tolist()}")
+                        print(f"📝 最终概率: {[f'{p:.4f}' for p in final_prob]}")
+                        print(f"📝 最终预测: {final_pred_cls.tolist()}")
+                        print(f"📝 最终准确率: {final_acc:.4f} | 正样本F1: {final_pos_f1:.4f}")
+                        print(f"📝 收敛轮数: {actual_cycle}")
+                        print("=" * 100 + "\n")
+
+                    total_samples += 1
+
+                # -------------------- 运行时异常捕获 --------------------
+                except Exception as e:
+                    total_runtime_errors += 1
+                    runtime_error_info = {
+                        "sample_idx": sample_idx,
+                        "batch_idx": batch_idx,
+                        "batch_sample_idx": b,
+                        "error_type": type(e).__name__,
+                        "error_msg": str(e),
+                        "traceback": traceback.format_exc()
+                    }
+                    runtime_error_records.append(runtime_error_info)
+
+                    # 即时打印运行时异常（红色标注）
+                    print("\n" + "=" * 100)
+                    print(f"❌ 【样本运行时错误】- 全局样本索引: {sample_idx}")
+                    print("=" * 100)
+                    print(f"📌 错误位置：批次 {batch_idx} | 批次内样本 {b}")
+                    print(f"🔍 异常类型：{runtime_error_info['error_type']}")
+                    print(f"📝 异常描述：{runtime_error_info['error_msg'][:100]}...")
+                    print(f"📜 完整堆栈：\n{runtime_error_info['traceback']}")
+                    print("=" * 100 + "\n")
+
+                    continue
 
             pbar.update(1)
 
     pbar.close()
 
-    # 5. 生成统计报告（完全对齐训练的打印格式）
+    # ===================== 最终统计报告 =====================
     print("\n" + "=" * 80)
-    print("数据集推理统计报告（完全对齐训练逻辑）")
+    print("数据集推理统计报告（含异常监控+位置正确率）")
     print("=" * 80)
 
-    # 5.1 核心指标（和训练一致）
+    # 核心指标
     print("\n【核心指标】")
-    print(f"平均收敛轮数: {np.mean(cycle_num_list):.2f}")
-    print(f"收敛率: {np.mean(is_converged_list):.4f} (收敛样本数/总样本数)")
-    print(f"每轮平均准确率: {np.mean(avg_acc_per_cycle_list):.4f}")
-    print(f"平均F1: {np.mean(avg_f1_list):.4f}")
-    print(f"最终总准确率: {np.mean(final_acc_list):.4f}")
-    print(f"最终正样本F1: {np.mean(final_f1_list):.4f}")
+    print(f"平均收敛轮数: {np.mean(cycle_num_list):.2f}" if cycle_num_list else 0.0)
+    print(f"收敛率: {np.mean(is_converged_list):.4f}" if is_converged_list else 0.0)
+    print(f"每轮平均准确率: {np.mean(avg_acc_per_cycle_list):.4f}" if avg_acc_per_cycle_list else 0.0)
+    print(f"平均F1: {np.mean(avg_f1_list):.4f}" if avg_f1_list else 0.0)
+    print(f"最终总准确率: {np.mean(final_acc_list):.4f}" if final_acc_list else 0.0)
+    print(f"最终正样本F1: {np.mean(final_f1_list):.4f}" if final_f1_list else 0.0)
 
-    # 5.2 循环轮数分布
+    # 新增：位置级统计（核心修改）
+    print("\n【12个位置正确率统计（最终预测）】")
+    print("-" * 60)
+    print(f"{'位置':<6} {'总样本数':<10} {'正确数':<10} {'正确率':<10}")
+    print("-" * 60)
+    pos_sample_acc = []
+    for pos_idx in range(12):
+        acc = pos_sample_correct[pos_idx] / (pos_sample_total[pos_idx] + 1e-6)
+        pos_sample_acc.append(acc)
+        print(f"{pos_idx + 1:<6} {pos_sample_total[pos_idx]:<10} {pos_sample_correct[pos_idx]:<10} {acc:<10.4f}")
+
+    print("\n【12个位置正确率统计（所有轮次平均）】")
+    print("-" * 60)
+    print(f"{'位置':<6} {'总预测次数':<12} {'正确次数':<12} {'正确率':<10}")
+    print("-" * 60)
+    pos_total_acc = []
+    for pos_idx in range(12):
+        acc = pos_correct[pos_idx] / (pos_total[pos_idx] + 1e-6)
+        pos_total_acc.append(acc)
+        print(f"{pos_idx + 1:<6} {pos_total[pos_idx]:<12} {pos_correct[pos_idx]:<12} {acc:<10.4f}")
+
+    # 循环轮数分布
     print("\n【循环轮数分布】")
-    cycle_num_stats = {}
     for cycle in range(1, max_cycles + 1):
-        count = sum(1 for c in cycle_num_list if c == cycle)
+        count = sum(1 for c in cycle_num_list if c == cycle) if cycle_num_list else 0
         ratio = count / total_samples * 100 if total_samples > 0 else 0
-        cycle_num_stats[cycle] = (count, ratio)
         print(f"第{cycle}轮终止的样本数: {count} ({ratio:.2f}%)")
 
-    # 5.3 每轮详细指标（和训练一致）
+    # 每轮详细指标
     print("\n【每轮平均准确率/F1】")
     for cycle_idx in range(len(per_cycle_acc)):
         avg_acc = np.mean(per_cycle_acc[cycle_idx]) if per_cycle_acc[cycle_idx] else 0.0
         avg_f1 = np.mean(per_cycle_f1[cycle_idx]) if per_cycle_f1[cycle_idx] else 0.0
         print(f"第{cycle_idx + 1}轮 - 准确率: {avg_acc:.4f} | F1: {avg_f1:.4f}")
 
-    # 返回完整统计结果
+    # 异常汇总
+    print("\n【❌ 异常汇总】")
+    print(
+        f"运行时异常样本数: {total_runtime_errors} / {len(dataset)} ({total_runtime_errors / len(dataset) * 100:.2f}%)")
+    print(f"逻辑异常样本数: {total_logic_errors} / {len(dataset)} ({total_logic_errors / len(dataset) * 100:.2f}%)")
+
+    # 运行时异常详情
+    if total_runtime_errors > 0:
+        print("\n【运行时异常详情】")
+        for idx, err in enumerate(runtime_error_records):
+            print(f"\n错误{idx + 1} - 样本{err['sample_idx']}:")
+            print(f"  类型: {err['error_type']} | 描述: {err['error_msg'][:100]}...")
+
+    # 逻辑异常详情
+    if total_logic_errors > 0:
+        print("\n【逻辑异常详情】")
+        for idx, err in enumerate(logic_error_records):
+            print(f"\n异常{idx + 1} - 样本{err['sample_idx']}:")
+            print(f"  原因: {'; '.join(err['error_reasons'])}")
+            print(f"  准确率: {err['final_acc']:.4f} | F1: {err['final_pos_f1']:.4f}")
+            print(f"  位置预测: {err['final_pos_pred']}")
+
+    # 返回完整结果（新增位置统计）
     return {
-        "avg_converge_cycles": np.mean(cycle_num_list),
-        "converge_rate": np.mean(is_converged_list),
-        "avg_acc_per_cycle": np.mean(avg_acc_per_cycle_list),
-        "avg_f1": np.mean(avg_f1_list),
-        "final_total_acc": np.mean(final_acc_list),
-        "final_pos_f1": np.mean(final_f1_list),
-        "cycle_num_dist": cycle_num_stats,
-        "per_cycle_metrics": {
-            "acc": [np.mean(acc) if acc else 0.0 for acc in per_cycle_acc],
-            "f1": [np.mean(f1) if f1 else 0.0 for f1 in per_cycle_f1]
+        "core_metrics": {
+            "avg_converge_cycles": np.mean(cycle_num_list) if cycle_num_list else 0.0,
+            "converge_rate": np.mean(is_converged_list) if is_converged_list else 0.0,
+            "avg_acc_per_cycle": np.mean(avg_acc_per_cycle_list) if avg_acc_per_cycle_list else 0.0,
+            "avg_f1": np.mean(avg_f1_list) if avg_f1_list else 0.0,
+            "final_total_acc": np.mean(final_acc_list) if final_acc_list else 0.0,
+            "final_pos_f1": np.mean(final_f1_list) if final_f1_list else 0.0
+        },
+        # 新增：位置级指标
+        "position_metrics": {
+            "final_pred": {  # 最终预测的位置统计
+                "pos_total": pos_sample_total,
+                "pos_correct": pos_sample_correct,
+                "pos_acc": pos_sample_acc
+            },
+            "all_cycles": {  # 所有轮次的位置统计
+                "pos_total": pos_total,
+                "pos_correct": pos_correct,
+                "pos_acc": pos_total_acc
+            }
+        },
+        "runtime_errors": {
+            "count": total_runtime_errors,
+            "records": runtime_error_records
+        },
+        "logic_errors": {
+            "count": total_logic_errors,
+            "records": logic_error_records
         }
     }
 
 
-# ===================== 二分类指标计算函数（必须保留，与训练逻辑一致） =====================
+# ===================== 二分类指标计算函数 =====================
 def calculate_2c_metrics(pred_logits, cls_target):
     """
     计算二分类任务的核心指标（总准确率/正样本精准率/召回率/F1）
@@ -501,9 +708,7 @@ def calculate_2c_metrics(pred_logits, cls_target):
     total_acc = total_correct / (cls_target.numel() + 1e-6)
 
     # 3. 计算正样本（1类：有方块）指标
-    # 正样本真实掩码
     pos_target_mask = (cls_target == 1)
-    # 正样本预测掩码
     pos_pred_mask = (pred_cls == 1)
     pos_total = pos_target_mask.sum().item()
 
@@ -521,38 +726,37 @@ def calculate_2c_metrics(pred_logits, cls_target):
     pos_recall = tp / (tp + fn + 1e-6)
     pos_f1 = 2 * pos_precision * pos_recall / (pos_precision + pos_recall + 1e-6)
 
-    # 返回指标（结构与推理代码严格匹配）
+    # 返回指标
     return {
         "total_acc": total_acc,
         "pos_metrics": {"acc": pos_acc, "precision": pos_precision, "recall": pos_recall, "f1": pos_f1}
     }
 
 
-# ===================== 主函数（参数对齐训练，易用性优化） =====================
+# ===================== 主函数 =====================
 def main():
-    # ===================== 全局参数（完全对齐训练的参数命名） =====================
+    # 全局参数
     MODE = "dataset"  # "dataset"（数据集） / "single"（单样本）
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 模型参数（和训练一致）
-    MODEL_SIZE = "s"  # YOLO11尺寸：n/s/l
-    ROI_IMG_SIZE = 64  # ROI尺寸（和训练一致）
-    MAX_CYCLES = 7  # 最大循环轮数（和训练一致）
-    MODEL_PATH = "H:\pycharm\yolov11\yolov11_proj1\yolo11_Custom_12roi_2\model_pt\yolo11sroi_best_cls2_0.pt"
+    # 模型参数
+    MODEL_SIZE = "s"
+    ROI_IMG_SIZE = 64
+    MAX_CYCLES = 4
+    MODEL_PATH = "H:\pycharm\yolov11\yolov11_proj1\yolo11_Custom_12roi_2\model_pt\yolo11sroi_best_cls2_1.pt"
 
-    # 数据集模式参数
-    DATASET_ROOT = r"E:\test"
+    # 数据集参数
+    DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj3\global_tests_100"
     BATCH_SIZE = 16
 
-    # 单样本模式参数
+    # 单样本参数
     IMAGE_PATH = "H:\pycharm\yolov11\yolov11_proj3\global_datasets_150\global_images\images_1.png"
     LABEL_PATH = "H:\pycharm\yolov11\yolov11_proj3\global_datasets_150\labels\label_1.json"
 
     print(f"使用设备: {DEVICE}")
 
-    # ===================== 模式执行 =====================
     if MODE == "single":
-        # 1. 加载模型（和训练一致）
+        # 加载模型
         model = YOLO11ROIClassifier(
             model_size=MODEL_SIZE,
             num_roi=12,
@@ -560,38 +764,35 @@ def main():
             roi_size=ROI_IMG_SIZE
         ).to(DEVICE)
 
-        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
         if "model_state_dict" in checkpoint:
             model.load_state_dict(checkpoint["model_state_dict"])
         else:
             model.load_state_dict(checkpoint)
         model.eval()
 
-        # 2. 加载图像和标签（支持JSON格式）
-        # 2.1 加载图像
+        # 加载图像和标签
         global_img_np = cv2.imread(IMAGE_PATH)
         if global_img_np is None:
             raise ValueError(f"无法加载图像：{IMAGE_PATH}")
         global_img_np = cv2.cvtColor(global_img_np, cv2.COLOR_BGR2RGB)
 
-        # 2.2 加载JSON标签文件并解析
         if not os.path.exists(LABEL_PATH):
             raise ValueError(f"标签文件不存在：{LABEL_PATH}")
 
         with open(LABEL_PATH, 'r', encoding='utf-8') as f:
             label_data = json.load(f)
 
-        # 提取核心字段
         label_np = np.array(label_data["labels"], dtype=np.float32)
         rvec = np.array(label_data["rvec"], dtype=np.float32).reshape(3, 1)
         tvec = np.array(label_data["tvec"], dtype=np.float32).reshape(3, 1)
 
-        # 打印验证读取结果
+        # 打印验证
         print(f"\n从JSON读取的标签: {label_np.tolist()}")
         print(f"从JSON读取的rvec: {rvec.flatten().tolist()}")
         print(f"从JSON读取的tvec: {tvec.flatten().tolist()}")
 
-        # 3. 数据预处理（和训练一致的val_transform）
+        # 数据预处理
         yolo11_mean = [0.485, 0.456, 0.406]
         yolo11_std = [0.229, 0.224, 0.225]
         val_transform = transforms.Compose([
@@ -600,7 +801,7 @@ def main():
             transforms.Normalize(mean=yolo11_mean, std=yolo11_std)
         ])
 
-        # 4. 单样本推理
+        # 单样本推理
         infer_single_sample_verbose(
             global_img_np=global_img_np,
             label_np=label_np,
@@ -615,7 +816,7 @@ def main():
 
     elif MODE == "dataset":
         # 数据集推理
-        infer_dataset(
+        infer_result = infer_dataset(
             dataset_root=DATASET_ROOT,
             model_path=MODEL_PATH,
             model_size=MODEL_SIZE,
@@ -624,6 +825,12 @@ def main():
             batch_size=BATCH_SIZE,
             device=DEVICE
         )
+
+        # 可选：保存位置统计结果到JSON
+        save_path = "./position_metrics.json"
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(infer_result["position_metrics"], f, ensure_ascii=False, indent=2)
+        print(f"\n✅ 位置统计结果已保存至：{save_path}")
 
 
 if __name__ == "__main__":
