@@ -257,8 +257,6 @@ def evaluate(model, val_loader, loss_fn, device):
     pos_acc_sum, pos_precision_sum, pos_recall_sum, pos_f1_sum = 0.0, 0.0, 0.0, 0.0
     pred_cls_all = []
     with torch.no_grad():
-        for bitch_idx, bitch_data in enumerate(val_loader):
-            print(f"len(bitch_data): f{bitch_data}")
         for batch_idx, (roi_imgs, cls_target, roi_valid_mask) in enumerate(val_loader):
             roi_imgs = roi_imgs.to(device)
             cls_target = cls_target.to(device)
@@ -352,12 +350,12 @@ def load_yolo11_pretrained_weights(model, model_size, load_path):
         if target_key in current_model_dict:
             if current_model_dict[target_key].shape == official_param.shape:
                 mapped_state_dict[target_key] = official_param
-                print(f"✅ 匹配权重: {official_key:40s} → {target_key}")
-            else:
-                print(f"⚠️ 跳过权重（形状不匹配）: {official_key}")
-                print(f"   官方形状: {official_param.shape} | 你的模型形状: {current_model_dict[target_key].shape}")
-        else:
-            print(f"⚠️ 跳过权重（键不存在）: {official_key} → {target_key}")
+                # print(f"✅ 匹配权重: {official_key:40s} → {target_key}")
+            # else:
+                # print(f"⚠️ 跳过权重（形状不匹配）: {official_key}")
+                # print(f"   官方形状: {official_param.shape} | 你的模型形状: {current_model_dict[target_key].shape}")
+        # else:
+            # print(f"⚠️ 跳过权重（键不存在）: {official_key} → {target_key}")
 
     # 3. 加载对齐后的权重（strict=False跳过head等不匹配层）
     print("\n🔧 开始加载权重到模型...")

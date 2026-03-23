@@ -505,7 +505,7 @@ class YOLO11ROIInferencer:
 # 测试入口
 if __name__ == "__main__":
     # 核心配置
-    MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj1\yolo11_Custom_12roi_2\model_pt\yolo11sroi_best_cls2_2.pt"
+    MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_R0\yolo11_pt\yolo11s_roi12_bce_4.pt"
     MODEL_SIZE = "s"
     ROI_SIZE = 64
 
