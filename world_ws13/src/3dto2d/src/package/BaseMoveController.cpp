@@ -13,8 +13,6 @@ BaseMoveController::BaseMoveController(ros::NodeHandle& nh)
 
     initializeTargetList();
     cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
-
-    // ===================== 初始化静止检测时间 =====================
     state_.static_start_time = std::chrono::steady_clock::now();
 }
 
@@ -37,7 +35,6 @@ bool BaseMoveController::start() {
             state_.target_y = state_.target_list[0].second;
         }
         state_.flag = 0;
-        // 重置静止检测
         state_.last_lidar_x = 0.0f;
         state_.last_lidar_y = 0.0f;
         state_.static_start_time = std::chrono::steady_clock::now();
@@ -104,27 +101,29 @@ void BaseMoveController::initializeTargetList() {
 }
 
 void BaseMoveController::tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg) {
+    bool found = false;
     for (const auto& transform : msg->transforms) {
-        if(transform.child_frame_id != "base_footprint") {
-            continue;
-        }
-        float x = transform.transform.translation.x;
-        float y = transform.transform.translation.y;
-        geometry_msgs::Quaternion quat = transform.transform.rotation;
-        tf2::Quaternion tf_quat(quat.x, quat.y, quat.z, quat.w);
-        tf2::Matrix3x3 mat(tf_quat);
-        double roll, pitch, yaw;
-        mat.getRPY(roll, pitch, yaw);
-        float yaw_deg = yaw * 180.0 / M_PI;
-        float adjusted_x = x - 0.28*cos(yaw) + 0.28;
-        float adjusted_y = y - 0.28*sin(yaw);
+        if(transform.child_frame_id == "base_footprint") {
+            float x = transform.transform.translation.x;
+            float y = transform.transform.translation.y;
+            geometry_msgs::Quaternion quat = transform.transform.rotation;
+            tf2::Quaternion tf_quat(quat.x, quat.y, quat.z, quat.w);
+            tf2::Matrix3x3 mat(tf_quat);
+            double roll, pitch, yaw;
+            mat.getRPY(roll, pitch, yaw);
+            float yaw_deg = yaw * 180.0 / M_PI;
+            float adjusted_x = x - 0.28*cos(yaw) + 0.28;
+            float adjusted_y = y - 0.28*sin(yaw);
 
-        std::lock_guard<std::mutex> lock(state_.mtx_lidar);
-        state_.lidar_x = adjusted_x;
-        state_.lidar_y = adjusted_y;
-        state_.lidar_yaw = yaw_deg;
-        break;
+            std::lock_guard<std::mutex> lock(state_.mtx_lidar);
+            state_.lidar_x = adjusted_x;
+            state_.lidar_y = adjusted_y;
+            state_.lidar_yaw = yaw_deg;
+            found = true;
+            break;
+        }
     }
+    if(!found) ROS_WARN_THROTTLE(1, "TF: No base_footprint found!");
 }
 
 void BaseMoveController::visualCallback(const geometry_msgs::PointStamped::ConstPtr& msg) {
@@ -141,12 +140,19 @@ bool BaseMoveController::checkArrival(float current_x, float current_y, float ta
     return distance < ARRIVAL_THRESHOLD;
 }
 
+// 核心修复：切换目标时重置PID，解决不动问题
 bool BaseMoveController::switchToNextTarget() {
     std::lock_guard<std::mutex> lock(state_.mtx_target_list);
     if (state_.target_list.empty()) {
         ROS_WARN("Target list is empty!");
         return false;
     }
+
+    // 重置所有PID控制器，清空积分饱和
+    pid_x_->reset();
+    pid_y_->reset();
+    pid_yaw_->reset();
+
     state_.current_target_index++;
     if (state_.current_target_index >= state_.target_list.size()) {
         ROS_INFO("Reached all target points! Stopping.");
@@ -154,14 +160,17 @@ bool BaseMoveController::switchToNextTarget() {
         completed_ = true;
         return false;
     }
+
     state_.target_x = state_.target_list[state_.current_target_index].first;
     state_.target_y = state_.target_list[state_.current_target_index].second;
     ROS_INFO("Switched to target %d: (%.2f, %.2f)",
              state_.current_target_index, state_.target_x, state_.target_y);
-    
-    // 切换目标后，重置静止检测
+
+    // 重置静止检测
     std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
     state_.static_start_time = std::chrono::steady_clock::now();
+    state_.last_lidar_x = state_.lidar_x;
+    state_.last_lidar_y = state_.lidar_y;
     return true;
 }
 
@@ -175,31 +184,24 @@ float BaseMoveController::calculateYawToPoint(float robot_x, float robot_y, floa
     return yaw_deg;
 }
 
-// ===================== 核心新增：8秒静止超时检测 =====================
+// 8秒静止超时检测
 void BaseMoveController::checkStaticTimeout(float current_x, float current_y) {
     if (completed_ || state_.flag == 1) return;
 
     std::lock_guard<std::mutex> lock(state_.mtx_lidar);
-    // 计算当前与上一帧的位移
     float dx = current_x - state_.last_lidar_x;
     float dy = current_y - state_.last_lidar_y;
     float move_dist = sqrt(dx*dx + dy*dy);
 
-    // 位移小于阈值 → 判定静止，开始计时
     if (move_dist < state_.STATIC_MOVE_THRESHOLD) {
         auto now = std::chrono::steady_clock::now();
         double static_time = std::chrono::duration<double>(now - state_.static_start_time).count();
-        
-        // 静止超过8秒 → 强制切换下一个目标点
+
         if (static_time >= state_.STATIC_TIMEOUT) {
             ROS_WARN("Robot static for 8s! Force switch to next target.");
             switchToNextTarget();
-            // 重置上一帧位置
-            state_.last_lidar_x = current_x;
-            state_.last_lidar_y = current_y;
         }
     } else {
-        // 机器人在移动 → 重置静止计时
         state_.static_start_time = std::chrono::steady_clock::now();
         state_.last_lidar_x = current_x;
         state_.last_lidar_y = current_y;
@@ -218,27 +220,27 @@ void BaseMoveController::controlLoop() {
     while (running_ && ros::ok()) {
         geometry_msgs::Twist vel_msg;
         int flag_local;
-        float current_x, current_y;  // 新增：当前位置
+        float current_x = 0, current_y = 0;
 
         {
             std::lock_guard<std::mutex> lock(state_.mtx_lidar);
             flag_local = state_.flag;
-            current_x = state_.lidar_x;  // 读取当前位置
+            current_x = state_.lidar_x;
             current_y = state_.lidar_y;
         }
 
-        // ===================== 调用：静止超时检测 =====================
+        // 执行静止检测
         checkStaticTimeout(current_x, current_y);
 
         if(flag_local == 0) {
             auto end = std::chrono::steady_clock::now();
-            auto duration = end - start;
-            double seconds_double = static_cast<double>(duration.count()) / 1e9;
+            double seconds_double = std::chrono::duration<double>(end - start).count();
 
             float pid_output_x = 0, pid_output_y = 0, pid_output_yaw = 0;
             {
                 std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
                 std::lock_guard<std::mutex> lock_target(state_.mtx_target);
+
                 float visual_x, visual_y;
                 bool use_visual;
                 {
@@ -247,22 +249,26 @@ void BaseMoveController::controlLoop() {
                     visual_y = state_.visual_y;
                     use_visual = state_.use_visual;
                 }
+
                 float dynamic_target_yaw = state_.target_yaw;
                 if (use_visual) {
                     dynamic_target_yaw = calculateYawToPoint(state_.lidar_x, state_.lidar_y, visual_x, visual_y);
                 }
+
                 pid_output_x = pid_x_->PIDcalculate(state_.target_x, state_.lidar_x, seconds_double);
                 pid_output_y = pid_y_->PIDcalculate(state_.target_y, state_.lidar_y, seconds_double);
                 pid_output_yaw = pid_yaw_->PIDcalculate(dynamic_target_yaw, state_.lidar_yaw, seconds_double);
+
                 float yaw_rad = state_.lidar_yaw * M_PI / 180.0;
-                vel_msg.linear.x = pid_output_x * std::cos(yaw_rad) + pid_output_y * std::sin(yaw_rad);
-                vel_msg.linear.y = -pid_output_x * std::sin(yaw_rad) + pid_output_y * std::cos(yaw_rad);
+                vel_msg.linear.x = pid_output_x * cos(yaw_rad) + pid_output_y * sin(yaw_rad);
+                vel_msg.linear.y = -pid_output_x * sin(yaw_rad) + pid_output_y * cos(yaw_rad);
                 vel_msg.angular.z = pid_output_yaw;
             }
 
+            // 到达目标点判断
             auto current_time = std::chrono::steady_clock::now();
-            auto time_since_last_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
-            if (!completed_ && time_since_last_switch > MIN_SWITCH_INTERVAL) {
+            double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
+            if (!completed_ && time_since_switch > MIN_SWITCH_INTERVAL) {
                 float target_x, target_y;
                 {
                     std::lock_guard<std::mutex> lock_target(state_.mtx_target);
@@ -270,7 +276,7 @@ void BaseMoveController::controlLoop() {
                     target_y = state_.target_y;
                 }
                 if (checkArrival(current_x, current_y, target_x, target_y)) {
-                    ROS_INFO("Switching to next target point...");
+                    ROS_INFO("Arrived target! Switch next.");
                     if (switchToNextTarget()) {
                         last_target_switch_time = current_time;
                     }
@@ -281,6 +287,7 @@ void BaseMoveController::controlLoop() {
             vel_msg.linear.y = 0;
             vel_msg.angular.z = 0;
         }
+
         start = std::chrono::steady_clock::now();
         cmd_vel_pub_.publish(vel_msg);
         ros::spinOnce();
@@ -290,5 +297,4 @@ void BaseMoveController::controlLoop() {
     geometry_msgs::Twist stop_msg;
     cmd_vel_pub_.publish(stop_msg);
     ROS_INFO("BaseMoveController control loop finished.");
-    ros::shutdown();
 }

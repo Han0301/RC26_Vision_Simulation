@@ -11,7 +11,7 @@
 #include <vector>
 #include <atomic>
 #include <functional>
-#include <chrono>  // 新增时间头文件
+#include <chrono>
 
 class PIDcontroler;
 
@@ -34,8 +34,6 @@ private:
     bool checkArrival(float current_x, float current_y, float target_x, float target_y) const;
     bool switchToNextTarget();
     float calculateYawToPoint(float robot_x, float robot_y, float target_x, float target_y) const;
-
-    // 新增：静止超时检测函数
     void checkStaticTimeout(float current_x, float current_y);
 
     ros::NodeHandle& nh_;
@@ -66,12 +64,11 @@ private:
         std::mutex mtx_visual;
         std::mutex mtx_target_list;
 
-        // ===================== 新增：静止检测变量 =====================
-        float last_lidar_x = 0.0f;        // 上一帧机器人X坐标
-        float last_lidar_y = 0.0f;        // 上一帧机器人Y坐标
-        std::chrono::steady_clock::time_point static_start_time;  // 静止起始时间
-        const float STATIC_TIMEOUT = 8.0f;        // 静止超时时间：8秒
-        const float STATIC_MOVE_THRESHOLD = 0.05f;// 静止判断阈值：2cm内算没动
+        float last_lidar_x = 0.0f;
+        float last_lidar_y = 0.0f;
+        std::chrono::steady_clock::time_point static_start_time;
+        const float STATIC_TIMEOUT = 8.0f;
+        const float STATIC_MOVE_THRESHOLD = 0.02f;
     } state_;
 
     std::unique_ptr<PIDcontroler> pid_x_;
