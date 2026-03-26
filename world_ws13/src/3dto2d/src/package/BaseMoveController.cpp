@@ -4,6 +4,7 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <chrono>
 #include <cmath>
+#include <random>
 
 BaseMoveController::BaseMoveController(ros::NodeHandle& nh)
     : nh_(nh) {
@@ -11,7 +12,46 @@ BaseMoveController::BaseMoveController(ros::NodeHandle& nh)
     pid_y_ = std::make_unique<PIDcontroler>();
     pid_yaw_ = std::make_unique<PIDcontroler>(0.31, 0.3, 0.02, 0.08, 0.0, 0.0);
 
-    initializeTargetList();
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist_x(0.12f, 1.6f);
+    std::uniform_real_distribution<float> dist_y(-0.75f, 4.0f);
+    const int POINTS_NUM = 12;
+    const float MIN_DISTANCE = 0.4f;
+    const int MAX_ATTEMPTS = 100;
+
+    state_.target_list.reserve(POINTS_NUM);
+    for (int p = 0; p < POINTS_NUM; ++p) {
+        float rand_x, rand_y;
+        bool is_valid;
+        int attempts = 0;
+
+        do {
+            is_valid = true;
+            rand_x = dist_x(gen);
+            rand_y = dist_y(gen);
+
+            // 检查与之前所有点的距离
+            for (const auto& prev_point : state_.target_list) {
+                float dx = rand_x - prev_point.first;
+                float dy = rand_y - prev_point.second;
+                if (sqrt(dx*dx + dy*dy) < MIN_DISTANCE) {
+                    is_valid = false;
+                    break;
+                }
+            }
+            attempts++;
+        } while (!is_valid && attempts < MAX_ATTEMPTS);
+
+        state_.target_list.emplace_back(rand_x, rand_y);
+    }
+
+    if (!state_.target_list.empty()) {
+        state_.target_x = state_.target_list[0].first;
+        state_.target_y = state_.target_list[0].second;
+    }
+    state_.current_target_index = 0;
+    
     cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
     state_.static_start_time = std::chrono::steady_clock::now();
 }
@@ -76,30 +116,6 @@ void BaseMoveController::waitForCompletion() {
     }
 }
 
-void BaseMoveController::initializeTargetList() {
-    std::lock_guard<std::mutex> lock(state_.mtx_target_list);
-    state_.target_list.clear();
-    state_.target_list.push_back(std::make_pair(0.0, 0.0));
-    state_.target_list.push_back(std::make_pair(0.95, 1.0));
-    state_.target_list.push_back(std::make_pair(0.0, 0.0));
-    state_.target_list.push_back(std::make_pair(0.0, 1.2));
-    state_.target_list.push_back(std::make_pair(0.95, 1.6));
-    state_.target_list.push_back(std::make_pair(0.0, 1.2));
-    state_.target_list.push_back(std::make_pair(0.9, -0.65));
-    state_.target_list.push_back(std::make_pair(0.0, -0.65));
-    state_.target_list.push_back(std::make_pair(1.7, 1.6));
-    state_.target_list.push_back(std::make_pair(1.7, 3.0));
-    state_.target_list.push_back(std::make_pair(1.4, 3.0));
-    state_.target_list.push_back(std::make_pair(1.7, -0.4));
-    state_.target_list.push_back(std::make_pair(2.1, 1.7));
-
-    if (!state_.target_list.empty()) {
-        state_.target_x = state_.target_list[0].first;
-        state_.target_y = state_.target_list[0].second;
-    }
-    ROS_INFO("Target list initialized with %zu points", state_.target_list.size());
-}
-
 void BaseMoveController::tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg) {
     bool found = false;
     for (const auto& transform : msg->transforms) {
@@ -120,6 +136,7 @@ void BaseMoveController::tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg) {
             state_.lidar_y = adjusted_y;
             state_.lidar_yaw = yaw_deg;
             found = true;
+            // std::cout << "state_.x: " << state_.lidar_x << ", state_.y: " << state_.lidar_y << ", _yaw: " << state_.lidar_yaw << std::endl;
             break;
         }
     }
@@ -140,19 +157,15 @@ bool BaseMoveController::checkArrival(float current_x, float current_y, float ta
     return distance < ARRIVAL_THRESHOLD;
 }
 
-// 核心修复：切换目标时重置PID，解决不动问题
 bool BaseMoveController::switchToNextTarget() {
     std::lock_guard<std::mutex> lock(state_.mtx_target_list);
     if (state_.target_list.empty()) {
         ROS_WARN("Target list is empty!");
         return false;
     }
-
-    // 重置所有PID控制器，清空积分饱和
     pid_x_->reset();
     pid_y_->reset();
     pid_yaw_->reset();
-
     state_.current_target_index++;
     if (state_.current_target_index >= state_.target_list.size()) {
         ROS_INFO("Reached all target points! Stopping.");
@@ -166,7 +179,6 @@ bool BaseMoveController::switchToNextTarget() {
     ROS_INFO("Switched to target %d: (%.2f, %.2f)",
              state_.current_target_index, state_.target_x, state_.target_y);
 
-    // 重置静止检测
     std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
     state_.static_start_time = std::chrono::steady_clock::now();
     state_.last_lidar_x = state_.lidar_x;
@@ -184,7 +196,6 @@ float BaseMoveController::calculateYawToPoint(float robot_x, float robot_y, floa
     return yaw_deg;
 }
 
-// 8秒静止超时检测
 void BaseMoveController::checkStaticTimeout(float current_x, float current_y) {
     if (completed_ || state_.flag == 1) return;
 
@@ -229,7 +240,6 @@ void BaseMoveController::controlLoop() {
             current_y = state_.lidar_y;
         }
 
-        // 执行静止检测
         checkStaticTimeout(current_x, current_y);
 
         if(flag_local == 0) {
@@ -258,6 +268,13 @@ void BaseMoveController::controlLoop() {
                 pid_output_x = pid_x_->PIDcalculate(state_.target_x, state_.lidar_x, seconds_double);
                 pid_output_y = pid_y_->PIDcalculate(state_.target_y, state_.lidar_y, seconds_double);
                 pid_output_yaw = pid_yaw_->PIDcalculate(dynamic_target_yaw, state_.lidar_yaw, seconds_double);
+                
+                auto current_time = std::chrono::steady_clock::now();
+                double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
+                if (time_since_switch < 3.0) {
+                    if (fabs(pid_output_x) < 0.1f) pid_output_x = 0.2f;
+                    if (fabs(pid_output_y) < 0.1f) pid_output_y = 0.2f;
+                }
 
                 float yaw_rad = state_.lidar_yaw * M_PI / 180.0;
                 vel_msg.linear.x = pid_output_x * cos(yaw_rad) + pid_output_y * sin(yaw_rad);
@@ -265,7 +282,6 @@ void BaseMoveController::controlLoop() {
                 vel_msg.angular.z = pid_output_yaw;
             }
 
-            // 到达目标点判断
             auto current_time = std::chrono::steady_clock::now();
             double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
             if (!completed_ && time_since_switch > MIN_SWITCH_INTERVAL) {
@@ -279,6 +295,7 @@ void BaseMoveController::controlLoop() {
                     ROS_INFO("Arrived target! Switch next.");
                     if (switchToNextTarget()) {
                         last_target_switch_time = current_time;
+                        start = current_time;
                     }
                 }
             }

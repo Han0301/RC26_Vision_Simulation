@@ -77,6 +77,7 @@ private:
 
     const float ARRIVAL_THRESHOLD = 0.05f;
     const double MIN_SWITCH_INTERVAL = 2.0;
+
 };
 
 #endif

@@ -69,6 +69,8 @@ struct G
     bool pose_updated = false;              // 位姿更新标记
     bool image_updated = false;             // 图像更新标记
     std::mutex data_mutex;                  // 互斥锁，防止数据竞争
+
+    std::vector<cv::Point2d> save_datasets_pos;
 }global;
 
 void zbuffer_process()
@@ -125,8 +127,10 @@ void zbuffer_process()
     static Ten::XYZRPY last_tf;         // 上一帧的tf
     static Ten::XYZRPY total_tf;        // 累积的tf差值
     bool place_update = Ten::_OCCLUSION_HANDING_.is_pos_update(tf, last_tf, total_tf);      // 判断位置是否移动到一定程度
+    bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));
 
-    if (place_update)
+    static int start_update = 0;
+    if (place_update && tf_update && start_update > 5)
     { 
         static int save_count = 1;
         bool is_update = true;      // set_box_lists_ 内部判断是否所有方块都在画面中
@@ -136,6 +140,7 @@ void zbuffer_process()
         std::cout << "-------------------------------------------------------" << std::endl;
         if (is_update)
         {
+            global.save_datasets_pos.push_back(cv::Point2d(tf._xyz._x, tf._xyz._y));
             Ten::_OCCLUSION_HANDING_.save_dataset(
                 Ten::_INIT_3D_BOX_.box_lists_,
                 global._image,
@@ -148,6 +153,7 @@ void zbuffer_process()
             save_count += 1;
         }
     }
+    start_update += 1;
 }
 
 // 回调函数1：处理/robot_pose话题
@@ -220,6 +226,7 @@ int main(int argc, char **argv)
     ros::Rate rate(10);
     while(ros::ok())
     {
+        // std::cout << "move_controller.isCompleted(): " << move_controller.isCompleted() << std::endl;
         if (move_controller.isCompleted()) {
             ros::shutdown();
             break;

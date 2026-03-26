@@ -252,6 +252,30 @@ bool is_pos_update(Ten::XYZRPY& tf, Ten::XYZRPY& last_tf, Ten::XYZRPY&total_tf);
  */
 std::vector<int> processMapFile(const std::string& folderPath, int index);
 
+/**
+ * @brief 检查目标点是否与容器中所有点满足坐标差值要求
+ * @param points 容器内的点集
+ * @param target 待检查的目标点
+ * @return true: 所有点的x差>0.15且y差>0.25; false: 存在至少一个点不满足
+ */
+bool checkPointDistance(const std::vector<cv::Point2d>& points, const cv::Point2d& target) {
+    const double MIN_X_DIFF = 0.12;
+    const double MIN_Y_DIFF = 0.20;
+
+    for (const auto& pt : points) {
+        double dx = std::fabs(target.x - pt.x);
+        double dy = std::fabs(target.y - pt.y);
+        
+        // 只要有一个点不满足，直接返回false
+        if (dx <= MIN_X_DIFF && dy <= MIN_Y_DIFF) {
+            return false;
+        }
+    }
+    
+    // 所有点都满足要求
+    return true;
+}
+
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
@@ -558,6 +582,7 @@ bool create_json_file(const std::string& json_path,
     std::cout << "\n生成的JSON内容：\n" << json_str << std::endl;
     return true;
 }
+
 };
 
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
