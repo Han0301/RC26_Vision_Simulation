@@ -183,6 +183,7 @@ bool BaseMoveController::switchToNextTarget() {
     state_.static_start_time = std::chrono::steady_clock::now();
     state_.last_lidar_x = state_.lidar_x;
     state_.last_lidar_y = state_.lidar_y;
+    force_move_counter_ = 40; 
     return true;
 }
 
@@ -245,12 +246,16 @@ void BaseMoveController::controlLoop() {
         if(flag_local == 0) {
             auto end = std::chrono::steady_clock::now();
             double seconds_double = std::chrono::duration<double>(end - start).count();
+            
+            // 强制修正dt
+            if (seconds_double <= 0 || seconds_double > 1.0) seconds_double = 0.09;
 
             float pid_output_x = 0, pid_output_y = 0, pid_output_yaw = 0;
             {
                 std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
                 std::lock_guard<std::mutex> lock_target(state_.mtx_target);
 
+                // 完全保留视觉跟随
                 float visual_x, visual_y;
                 bool use_visual;
                 {
@@ -265,26 +270,33 @@ void BaseMoveController::controlLoop() {
                     dynamic_target_yaw = calculateYawToPoint(state_.lidar_x, state_.lidar_y, visual_x, visual_y);
                 }
 
+                // 正常PID计算
                 pid_output_x = pid_x_->PIDcalculate(state_.target_x, state_.lidar_x, seconds_double);
                 pid_output_y = pid_y_->PIDcalculate(state_.target_y, state_.lidar_y, seconds_double);
                 pid_output_yaw = pid_yaw_->PIDcalculate(dynamic_target_yaw, state_.lidar_yaw, seconds_double);
-                
-                auto current_time = std::chrono::steady_clock::now();
-                double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
-                if (time_since_switch < 3.0) {
-                    if (fabs(pid_output_x) < 0.1f) pid_output_x = 0.2f;
-                    if (fabs(pid_output_y) < 0.1f) pid_output_y = 0.2f;
+
+                // 🔥 2. 核心修复：如果强制移动标志位>0，直接绕过PID给固定速度
+                if (force_move_counter_ > 0) {
+                    force_move_counter_--;
+                    // 根据目标点方向直接给0.25m/s
+                    pid_output_x = (state_.target_x > state_.lidar_x) ? 0.25f : -0.25f;
+                    pid_output_y = (state_.target_y > state_.lidar_y) ? 0.25f : -0.25f;
+                    ROS_INFO("FORCE MOVE: counter=%d", force_move_counter_);
                 }
 
                 float yaw_rad = state_.lidar_yaw * M_PI / 180.0;
                 vel_msg.linear.x = pid_output_x * cos(yaw_rad) + pid_output_y * sin(yaw_rad);
                 vel_msg.linear.y = -pid_output_x * sin(yaw_rad) + pid_output_y * cos(yaw_rad);
-                vel_msg.angular.z = pid_output_yaw;
+                vel_msg.angular.z = pid_output_yaw; // 完全保留视觉yaw
+
+                ROS_INFO("DEBUG: VEL(%.2f, %.2f) | PID(%.2f, %.2f)",
+                        vel_msg.linear.x, vel_msg.linear.y, pid_output_x, pid_output_y);
             }
 
+            // 延迟5秒再判断到达
             auto current_time = std::chrono::steady_clock::now();
             double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
-            if (!completed_ && time_since_switch > MIN_SWITCH_INTERVAL) {
+            if (!completed_ && time_since_switch > 5.0) {
                 float target_x, target_y;
                 {
                     std::lock_guard<std::mutex> lock_target(state_.mtx_target);
@@ -294,8 +306,8 @@ void BaseMoveController::controlLoop() {
                 if (checkArrival(current_x, current_y, target_x, target_y)) {
                     ROS_INFO("Arrived target! Switch next.");
                     if (switchToNextTarget()) {
-                        last_target_switch_time = current_time;
-                        start = current_time;
+                        last_target_switch_time = std::chrono::steady_clock::now();
+                        start = std::chrono::steady_clock::now();
                     }
                 }
             }
