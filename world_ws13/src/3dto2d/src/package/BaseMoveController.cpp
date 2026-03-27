@@ -14,9 +14,9 @@ BaseMoveController::BaseMoveController(ros::NodeHandle& nh)
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist_x(0.12f, 1.6f);
-    std::uniform_real_distribution<float> dist_y(-0.75f, 4.0f);
-    const int POINTS_NUM = 12;
+    std::uniform_real_distribution<float> dist_x(0.20f, 1.55f);
+    std::uniform_real_distribution<float> dist_y(-0.70f, 3.8f);
+    const int POINTS_NUM = 10;
     const float MIN_DISTANCE = 0.4f;
     const int MAX_ATTEMPTS = 100;
 
@@ -68,7 +68,6 @@ bool BaseMoveController::start() {
     running_ = true;
     completed_ = false;
     {
-        std::lock_guard<std::mutex> lock(state_.mtx_target_list);
         state_.current_target_index = 0;
         if (!state_.target_list.empty()) {
             state_.target_x = state_.target_list[0].first;
@@ -98,8 +97,12 @@ bool BaseMoveController::isCompleted() const {
     return completed_;
 }
 
+void BaseMoveController::set_Completed()
+{
+    completed_ = true;
+}
+
 void BaseMoveController::setTargetList(const std::vector<std::pair<float, float>>& targets) {
-    std::lock_guard<std::mutex> lock(state_.mtx_target_list);
     state_.target_list = targets;
     state_.current_target_index = 0;
     if (!state_.target_list.empty()) {
@@ -131,7 +134,6 @@ void BaseMoveController::tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg) {
             float adjusted_x = x - 0.28*cos(yaw) + 0.28;
             float adjusted_y = y - 0.28*sin(yaw);
 
-            std::lock_guard<std::mutex> lock(state_.mtx_lidar);
             state_.lidar_x = adjusted_x;
             state_.lidar_y = adjusted_y;
             state_.lidar_yaw = yaw_deg;
@@ -144,7 +146,6 @@ void BaseMoveController::tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg) {
 }
 
 void BaseMoveController::visualCallback(const geometry_msgs::PointStamped::ConstPtr& msg) {
-    std::lock_guard<std::mutex> lock(state_.mtx_visual);
     state_.visual_x = msg->point.x;
     state_.visual_y = msg->point.y;
     state_.use_visual = true;
@@ -158,7 +159,6 @@ bool BaseMoveController::checkArrival(float current_x, float current_y, float ta
 }
 
 bool BaseMoveController::switchToNextTarget() {
-    std::lock_guard<std::mutex> lock(state_.mtx_target_list);
     if (state_.target_list.empty()) {
         ROS_WARN("Target list is empty!");
         return false;
@@ -179,11 +179,10 @@ bool BaseMoveController::switchToNextTarget() {
     ROS_INFO("Switched to target %d: (%.2f, %.2f)",
              state_.current_target_index, state_.target_x, state_.target_y);
 
-    std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
     state_.static_start_time = std::chrono::steady_clock::now();
     state_.last_lidar_x = state_.lidar_x;
     state_.last_lidar_y = state_.lidar_y;
-    force_move_counter_ = 40; 
+    force_move_counter_ = 6; 
     return true;
 }
 
@@ -198,14 +197,13 @@ float BaseMoveController::calculateYawToPoint(float robot_x, float robot_y, floa
 }
 
 void BaseMoveController::checkStaticTimeout(float current_x, float current_y) {
-    if (completed_ || state_.flag == 1) return;
-
-    std::lock_guard<std::mutex> lock(state_.mtx_lidar);
     float dx = current_x - state_.last_lidar_x;
     float dy = current_y - state_.last_lidar_y;
     float move_dist = sqrt(dx*dx + dy*dy);
 
-    if (move_dist < state_.STATIC_MOVE_THRESHOLD) {
+    const float REAL_MOVE_THRESHOLD = 0.06f; 
+
+    if (move_dist < REAL_MOVE_THRESHOLD) {
         auto now = std::chrono::steady_clock::now();
         double static_time = std::chrono::duration<double>(now - state_.static_start_time).count();
 
@@ -234,12 +232,9 @@ void BaseMoveController::controlLoop() {
         int flag_local;
         float current_x = 0, current_y = 0;
 
-        {
-            std::lock_guard<std::mutex> lock(state_.mtx_lidar);
-            flag_local = state_.flag;
-            current_x = state_.lidar_x;
-            current_y = state_.lidar_y;
-        }
+        flag_local = state_.flag;
+        current_x = state_.lidar_x;
+        current_y = state_.lidar_y;
 
         checkStaticTimeout(current_x, current_y);
 
@@ -252,19 +247,15 @@ void BaseMoveController::controlLoop() {
 
             float pid_output_x = 0, pid_output_y = 0, pid_output_yaw = 0;
             {
-                std::lock_guard<std::mutex> lock_lidar(state_.mtx_lidar);
-                std::lock_guard<std::mutex> lock_target(state_.mtx_target);
 
                 // 完全保留视觉跟随
                 float visual_x, visual_y;
                 bool use_visual;
-                {
-                    std::lock_guard<std::mutex> lock_visual(state_.mtx_visual);
-                    visual_x = state_.visual_x;
-                    visual_y = state_.visual_y;
-                    use_visual = state_.use_visual;
-                }
 
+                visual_x = state_.visual_x;
+                visual_y = state_.visual_y;
+                use_visual = state_.use_visual;
+                
                 float dynamic_target_yaw = state_.target_yaw;
                 if (use_visual) {
                     dynamic_target_yaw = calculateYawToPoint(state_.lidar_x, state_.lidar_y, visual_x, visual_y);
@@ -279,8 +270,8 @@ void BaseMoveController::controlLoop() {
                 if (force_move_counter_ > 0) {
                     force_move_counter_--;
                     // 根据目标点方向直接给0.25m/s
-                    pid_output_x = (state_.target_x > state_.lidar_x) ? 0.25f : -0.25f;
-                    pid_output_y = (state_.target_y > state_.lidar_y) ? 0.25f : -0.25f;
+                    pid_output_x = (state_.target_x > state_.lidar_x) ? 0.12f : -0.12f;
+                    pid_output_y = (state_.target_y > state_.lidar_y) ? 0.12f : -0.12f;
                     ROS_INFO("FORCE MOVE: counter=%d", force_move_counter_);
                 }
 
@@ -296,13 +287,10 @@ void BaseMoveController::controlLoop() {
             // 延迟5秒再判断到达
             auto current_time = std::chrono::steady_clock::now();
             double time_since_switch = std::chrono::duration<double>(current_time - last_target_switch_time).count();
-            if (!completed_ && time_since_switch > 5.0) {
+            if (!completed_ && time_since_switch > 3.0) {
                 float target_x, target_y;
-                {
-                    std::lock_guard<std::mutex> lock_target(state_.mtx_target);
-                    target_x = state_.target_x;
-                    target_y = state_.target_y;
-                }
+                target_x = state_.target_x;
+                target_y = state_.target_y;
                 if (checkArrival(current_x, current_y, target_x, target_y)) {
                     ROS_INFO("Arrived target! Switch next.");
                     if (switchToNextTarget()) {

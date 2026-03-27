@@ -71,6 +71,13 @@ struct G
     std::mutex data_mutex;                  // 互斥锁，防止数据竞争
 
     std::vector<cv::Point2d> save_datasets_pos;
+
+    // 🔥 新增：长时间静止检测变量
+    cv::Point2d last_check_pos;       // 上一次检测时的位置
+    std::chrono::steady_clock::time_point static_start_time; // 开始静止的时间
+    bool first_pos_recorded = false;   // 是否记录了第一个位置
+    const double MAX_STATIC_TIME = 16.0; // 最大静止时间：60秒
+    const double STATIC_DIST_THRESHOLD = 0.1; // 静止距离阈值：0.1米
 }global;
 
 void zbuffer_process()
@@ -226,12 +233,12 @@ int main(int argc, char **argv)
     ros::Rate rate(10);
     while(ros::ok())
     {
-        // std::cout << "move_controller.isCompleted(): " << move_controller.isCompleted() << std::endl;
+        std::cout << "move_controller.isCompleted(): " << move_controller.isCompleted() << std::endl;
         if (move_controller.isCompleted()) {
             ros::shutdown();
             break;
         }
-        
+
         // sensor_msgs::ImagePtr msg;
         // sensor_msgs::ImagePtr roi_msg;
         // {

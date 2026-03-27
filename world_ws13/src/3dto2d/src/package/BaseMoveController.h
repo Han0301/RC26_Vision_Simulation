@@ -25,7 +25,8 @@ public:
     bool isCompleted() const;
     void setTargetList(const std::vector<std::pair<float, float>>& targets);
     void waitForCompletion();
-
+    void set_Completed();
+    
 private:
     void controlLoop();
     void tfCallback(const tf2_msgs::TFMessage::ConstPtr& msg);
@@ -68,7 +69,7 @@ private:
         float last_lidar_y = 0.0f;
         std::chrono::steady_clock::time_point static_start_time;
         const float STATIC_TIMEOUT = 8.0f;
-        const float STATIC_MOVE_THRESHOLD = 0.02f;
+        const float STATIC_MOVE_THRESHOLD = 0.06f;
     } state_;
 
     std::unique_ptr<PIDcontroler> pid_x_;
