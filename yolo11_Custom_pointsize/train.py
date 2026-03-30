@@ -7,9 +7,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR      # 余弦退火学习
 from torchvision import transforms      # torchvision 的图像变换模块，用于数据增强 / 预处理
 
 # 自定义模块
-from dataset import ROI12ImageDataset
-from model import YOLO11ROIClassifier, calculate_2c_metrics, evaluate, load_yolo11_pretrained_weights
+from model import YOLO11ROIClassifier, calculate_2c_metrics, evaluate, load_yolo11_pretrained_weights,resume_training_from_checkpoint
 from loss import YOLO11ROIFocalLoss2C, YOLO11ROICOUNTLOSS, YOLO11ROIBCEWithLogitsLoss2C
+from datasets.dataset import ROI12ImageDataset
 
 if __name__ == '__main__':
     # 解决Windows多进程启动的bootstrap问题
@@ -33,7 +33,10 @@ if __name__ == '__main__':
     SAVE_DIR = "./yolo11_pt"      # 输出的模型路径
     MODEL_NAME = "yolo11s_roi12_ps_6.pt"
 
-    # 加载数据集的方式
+    RESUME_TRAIN = True  # True=加载之前的模型继续训练
+    CHECKPOINT_PATH = r"./yolo11_pt/yolo11s_roi12_ps_6.pt"  # 之前保存的模型路径
+
+    # 1.3 加载数据集的方式
     load_datasets = True
     # 1 指定数据集
     DATASET_ROOTS = [        # 数据集路径
@@ -45,7 +48,7 @@ if __name__ == '__main__':
     TRAIN_DATASETS = [r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"]
     VAL_DATASETS = [r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"]
 
-    # 1.3 损失函数和优化器相关
+    # 1.4 损失函数和优化器相关
     LOSS_WEIGHT= [3.0, 1.0]    # 损失在两个类别上面的权重
     FOCAL_LOSS = 1.5                # 难样本挖掘系数
     LEARNING_RATE = 5e-5 if MODEL_SIZE == "l" else 1e-4 if MODEL_SIZE == "s" else 1e-3          # 学习率
@@ -129,11 +132,32 @@ if __name__ == '__main__':
         roi_size=ROI_IMG_SIZE
     ).to(DEVICE)
 
-    # 4.2 加载预训练权重
-    model = load_yolo11_pretrained_weights(model, model_size=MODEL_SIZE,
-                                           load_path="H:\pycharm\yolov11\yolov11.pt\yolo11s.pt")
+    # 4.2 优化器
+    for name, param in model.backbone.named_parameters():
+        if "layer0" in name or "layer1" in name or "layer2" in name:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+    param_groups = [
+        {"params": [p for n, p in model.backbone.named_parameters() if "layer0" in n or "layer1" in n or "layer2" in n],
+         "lr": LEARNING_RATE * 0.001},
+        {"params": [p for n, p in model.backbone.named_parameters() if "layer0" not in n and "layer1" not in n and "layer2" not in n],
+         "lr": LEARNING_RATE * 0.1},
+        {"params": model.neck.parameters(), "lr": LEARNING_RATE * 0.5},
+        {"params": model.head.parameters(), "lr": LEARNING_RATE}
+    ]
+    optimizer = torch.optim.AdamW(param_groups, weight_decay=WEIGHT_DECAY)      # adamw: 带权重衰减的优化器
 
-    # 4.3 加载损失
+    # 4.3 加载权重的方式
+    if RESUME_TRAIN:
+        best_pos_f1, start_epoch = resume_training_from_checkpoint(model, optimizer, CHECKPOINT_PATH, DEVICE)
+    else:
+        best_pos_f1 = 0.0
+        start_epoch = 0
+        model = load_yolo11_pretrained_weights(model, model_size=MODEL_SIZE,
+                                               load_path="H:\pycharm\yolov11\yolo11.pt\yolo11s.pt")
+
+    # 4.4 加载损失
     cls_loss_fn = YOLO11ROIFocalLoss2C(
         num_roi=NUM_ROI,
         num_classes=NUM_CLASSES,
@@ -151,39 +175,18 @@ if __name__ == '__main__':
         exist_count=8,
         weight=count_loss_weight
     )
-    # 4.4 参数的冻结策略
-    for name, param in model.backbone.named_parameters():
-        if "layer0" in name or "layer1" in name or "layer2" in name:
-            param.requires_grad = False
-        else:
-            param.requires_grad = True
 
-
-    # 4.5 分层学习率
-    param_groups = [
-        {"params": [p for n, p in model.backbone.named_parameters() if "layer0" in n or "layer1" in n or "layer2" in n],
-         "lr": LEARNING_RATE * 0.001},
-        {"params": [p for n, p in model.backbone.named_parameters() if "layer0" not in n and "layer1" not in n and "layer2" not in n],
-         "lr": LEARNING_RATE * 0.1},
-        {"params": model.neck.parameters(), "lr": LEARNING_RATE * 0.5},
-        {"params": model.head.parameters(), "lr": LEARNING_RATE}
-    ]
-
-    # 4.6 优化器
-    optimizer = torch.optim.AdamW(param_groups, weight_decay=WEIGHT_DECAY)      # adamw: 带权重衰减的优化器
-
-    # 4.7 学习率调度器(余弦退火)
+    # 4.5 学习率调度器(余弦退火)
     scheduler = CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
 
     # ===================== 5 训练循环 =====================
     # 5.1 创建模型输出路径
     os.makedirs(SAVE_DIR, exist_ok=True)        # exist_ok=True  路径存在也不报错
-    best_pos_f1 = 0.0   # 最佳 f1 值
     no_improve = 0      # 无提升早停计数器
 
     # 5.2 训练循环
     print(f"=== 开始训练（YOLO11-{MODEL_SIZE.upper()}） ===")
-    for epoch in range(EPOCHS):
+    for epoch in range(start_epoch,EPOCHS):
         # 5.2.1 将模型转为训练模式, 初始化指标
         model.train()
         epoch_loss = 0.0

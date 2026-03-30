@@ -377,3 +377,31 @@ def load_yolo11_pretrained_weights(model, model_size, load_path):
         print(f"   主要缺失键（自定义层）: {missing_keys[:5]}")
 
     return model
+
+
+def resume_training_from_checkpoint(model, optimizer, checkpoint_path, device):
+    """
+    断点续训：加载之前训练的checkpoint，恢复模型、优化器、最优F1、训练轮数
+    :param model: 初始化好的YOLO11ROIClassifier模型
+    :param optimizer: 初始化好的优化器
+    :param checkpoint_path: 之前保存的模型路径（.pt文件）
+    :param device: 训练设备
+    :return: best_pos_f1(最优F1), start_epoch(起始训练轮数)
+    """
+    # 加载checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    # 加载模型权重
+    model.load_state_dict(checkpoint['model_state_dict'])
+    # 加载优化器状态
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    # 加载最优F1
+    best_pos_f1 = checkpoint.get('best_pos_f1', 0.0)
+    # 加载起始轮数
+    start_epoch = checkpoint.get('epoch', 0)
+
+    print(f"✅ 断点续训加载成功！")
+    print(f"├─ 恢复模型权重 | 起始轮数：{start_epoch}")
+    print(f"└─ 恢复最优正样本F1：{best_pos_f1:.4f}")
+
+    return best_pos_f1, start_epoch

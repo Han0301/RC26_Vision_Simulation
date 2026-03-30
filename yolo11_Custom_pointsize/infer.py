@@ -7,6 +7,8 @@ import torch
 from pathlib import Path
 from torchvision import transforms
 from model import YOLO11ROIClassifier  # 确保model.py适配二分类
+from post_processing import post_process_linear_norm, post_process_sigmoid_balance, post_process_only_pred1, \
+    _compute_confidence
 
 
 class YOLO11ROIInferencer:
@@ -15,7 +17,6 @@ class YOLO11ROIInferencer:
     def __init__(self, model_path, dataset_root=None, model_size="s", roi_size=64, num_roi=12, num_classes=2):
         """初始化推理器"""
         # 设备配置
-        # self.device = torch.device("cpu")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # 核心参数
@@ -23,6 +24,8 @@ class YOLO11ROIInferencer:
         self.roi_size = roi_size
         self.num_roi = num_roi
         self.num_classes = num_classes
+        self.gt_labels = None
+        self.point_size = None
 
         # 数据集路径（原有逻辑，可选）
         self.dataset_root = dataset_root
@@ -137,7 +140,7 @@ class YOLO11ROIInferencer:
         print(f"\n✅ 文件夹ROI预处理完成 | 有效文件数：{len(roi_file_dict)} | 缺失数：{12 - len(roi_file_dict)}")
         return roi_imgs, roi_filenames
 
-    def infer_from_folder(self, roi_folder):
+    def infer_from_folder(self, roi_folder,point_size=None):
         """
         文件夹直接推理模式：读取指定文件夹内的12张ROI图片并推理
         :param roi_folder: ROI图片所在文件夹路径
@@ -150,6 +153,9 @@ class YOLO11ROIInferencer:
 
         # 推理（禁用梯度计算）
         with torch.no_grad():
+            if point_size is None:
+                point_size = np.ones(12, dtype=np.float32)
+
             pred_logits = self.model(roi_imgs)  # [1,12,2]
             pred_cls = torch.argmax(pred_logits, dim=-1).squeeze(0)  # [12,]
             pred_probs = torch.softmax(pred_logits, dim=-1).squeeze(0)  # [12,2]
@@ -231,7 +237,7 @@ class YOLO11ROIInferencer:
         with open(label_path, "r", encoding="utf-8") as f:
             ann = json.load(f)
         self.gt_labels = ann.get("labels", [0] * 12)  # 直接使用所有标签
-
+        self.point_size = torch.from_numpy(np.array(ann["point_size"], dtype=np.float32)).to(self.device)
         return roi_imgs
 
     def infer(self, img_idx):
@@ -239,9 +245,27 @@ class YOLO11ROIInferencer:
         roi_imgs = self.preprocess_roi(img_idx)
 
         with torch.no_grad():
+            point_size = _compute_confidence(self.point_size,self.device)
             pred_logits = self.model(roi_imgs)
-            pred_cls = torch.argmax(pred_logits, dim=-1).squeeze(0)
+            # 测试方法1
+            pred_cls, weighted_score = post_process_only_pred1(pred_logits, point_size)
+
+            # 测试方法2
+            # pred_cls, weighted_score = post_process_linear_norm(pred_logits, point_size)
+
+            # 测试方法3（推荐）
+            # pred_cls, weighted_score = post_process_sigmoid_balance(pred_logits, point_size)
+
             pred_probs = torch.softmax(pred_logits, dim=-1).squeeze(0)
+
+            # ===================== 【直接用返回的得分计算排名】 =====================
+            weighted_score_np = weighted_score.cpu().numpy()
+            point_size_np = point_size.cpu().numpy()
+            sorted_indices = np.argsort(weighted_score_np)[::-1]
+            roi_rank = np.zeros(12, dtype=int)
+            for rank, idx in enumerate(sorted_indices):
+                roi_rank[idx] = rank + 1
+
 
         # 转换为numpy
         pred_logits_np = pred_logits.squeeze(0).cpu().numpy()
@@ -256,23 +280,29 @@ class YOLO11ROIInferencer:
             "pred_probs": pred_probs_np,
             "pred_cls": pred_cls_np,
             "gt_labels": gt_labels_np,
-            "pred_conf": pred_conf_np
+            "pred_conf": pred_conf_np,
+            "point_size": point_size_np,  # 新增
+            "weighted_score": weighted_score_np,  # 新增
+            "rank": roi_rank  # 新增
         }
 
         # 打印结果
+        # ===================== 【修改：打印表头 + 新增列】 =====================
         print(f"\n========== 样本 {img_idx} 推理结果 ==========")
-        print("ROI序号 | 真实标签 | 预测类别 | 无方块概率 | 有方块概率 | 预测置信度")
-        print("-" * 70)
+        print("ROI序号 | 真实标签  | 预测类别   | 无方块概率  | 有方块概率  | 预测置信度  | point_size   | 加权得分   | 排名")
+        print("-" * 110)
         for i in range(12):
             print(
-                f"{i + 1:6d} | {gt_labels_np[i]:8d} | {pred_cls_np[i]:8d} | {pred_probs_np[i][0]:10.4f} | {pred_probs_np[i][1]:10.4f} | {pred_conf_np[i]:10.4f}")
-
+                f"{i + 1:6d} | {gt_labels_np[i]:8d} | {pred_cls_np[i]:8d} | {pred_probs_np[i][0]:10.4f} | {pred_probs_np[i][1]:10.4f} | {pred_conf_np[i]:10.4f} | {point_size_np[i]:9.4f} | {weighted_score_np[i]:8.4f} | {roi_rank[i]:4d}")
+        # ======================================================================
         return raw_results
 
-    def batch_infer_with_multi_thresholds(self, img_idx_list, conf_thresholds=[0.6, 0.7, 0.8],
+    def batch_infer_with_multi_thresholds(self, img_idx_list, conf_thresholds=None,
                                           error_log_path="infer_error_log.txt"):
         """原有逻辑：多阈值批量推理 + 新增分类准确率统计 + 新增分类高置信占总预测数比重"""
         # 校验阈值合法性
+        if conf_thresholds is None:
+            conf_thresholds = [0.6, 0.7, 0.8]
         for th in conf_thresholds:
             if not (0.0 <= th <= 1.0):
                 raise ValueError(f"置信度阈值必须在0-1之间！当前值：{th}")
@@ -540,7 +570,21 @@ if __name__ == "__main__":
     # ===================== 2. 原有批量多阈值推理模式（可选） =====================
     if RUN_BATCH_INFER:
         CONF_THRESHOLDS = [0.6,0.65,0.7, 0.75, 0.80, 0.85, 0.90, 0.95]
-        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179"
+        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"
+        label_dir = os.path.join(DATASET_ROOT, "labels")
+        valid_idxs = []
+
+        # 正则匹配 label_数字.json
+        pattern = re.compile(r"label_(\d+)\.json")
+        for filename in os.listdir(label_dir):
+            match = pattern.match(filename)
+            if match:
+                img_idx = int(match.group(1))
+                valid_idxs.append(img_idx)
+        # 排序并生成批量推理列表
+        BATCH_TEST_IDXS = sorted(valid_idxs)
+        print(f"\n✅ 自动扫描有效样本总数：{len(BATCH_TEST_IDXS)}")
+
         # 重新初始化推理器（需要dataset_root）
         inferencer_batch = YOLO11ROIInferencer(
             model_path=MODEL_PATH,
@@ -550,9 +594,7 @@ if __name__ == "__main__":
             num_roi=12,
             num_classes=2
         )
-        # 批量推理样本列表
-        # BATCH_TEST_IDXS = [i for i in range(1, 4755)]  # 前100个样本测试
-        BATCH_TEST_IDXS = [i for i in range(1, 180)]
+
         # 执行批量推理
         batch_stats = inferencer_batch.batch_infer_with_multi_thresholds(
             img_idx_list=BATCH_TEST_IDXS,
