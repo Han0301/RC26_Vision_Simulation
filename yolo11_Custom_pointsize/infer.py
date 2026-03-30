@@ -464,7 +464,7 @@ class YOLO11ROIInferencer:
 
         # ========== 核心修改5：控制台打印分类统计 ==========
         print(f"├─ 各阈值高置信度整体指标对比 ────────────────────────────────────")
-        print(f"│ 阈值   | 高置信ROI数 | 高置信正确数 | 高置信占比  | 高置信准确率")
+        print(f"│ 阈值   | 高置信ROI数   | 高置信正确数   | 高置信占比    | 高置信准确率")
         print(f"│--------|-------------|--------------|-------------|-------------")
         for th in conf_thresholds:
             stats = threshold_stats[th]
@@ -473,7 +473,7 @@ class YOLO11ROIInferencer:
 
         # 新增：打印按预测类别拆分的高置信度准确率 + 占总预测数比重
         print(f"├─ 各阈值高置信度分类指标对比 ────────────────────────────────────")
-        print(f"│ 阈值   | 0类高置信数 | 0类准确率   | 0类高置信占比 | 1类高置信数 | 1类准确率   | 1类高置信占比 ")
+        print(f"│ 阈值   | 0类高置信数 | 0类准确率       | 0类高置信占比   |  1类高置信数  | 1类准确率    | 1类高置信占比 ")
         print(f"│--------|-------------|-------------|---------------|-------------|-------------|---------------")
         for th in conf_thresholds:
             stats = threshold_stats[th]
@@ -505,7 +505,7 @@ class YOLO11ROIInferencer:
 # 测试入口
 if __name__ == "__main__":
     # 核心配置
-    MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_pointsize\yolo11_pt\yolo11s_roi12_ps_0.pt"
+    MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_pointsize\yolo11_pt\yolo11s_roi12_ps_5.pt"
     MODEL_SIZE = "s"
     ROI_SIZE = 64
 
@@ -540,7 +540,7 @@ if __name__ == "__main__":
     # ===================== 2. 原有批量多阈值推理模式（可选） =====================
     if RUN_BATCH_INFER:
         CONF_THRESHOLDS = [0.6,0.65,0.7, 0.75, 0.80, 0.85, 0.90, 0.95]
-        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"
+        DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179"
         # 重新初始化推理器（需要dataset_root）
         inferencer_batch = YOLO11ROIInferencer(
             model_path=MODEL_PATH,
@@ -552,7 +552,7 @@ if __name__ == "__main__":
         )
         # 批量推理样本列表
         # BATCH_TEST_IDXS = [i for i in range(1, 4755)]  # 前100个样本测试
-        BATCH_TEST_IDXS = [i for i in range(1, 2667)]
+        BATCH_TEST_IDXS = [i for i in range(1, 180)]
         # 执行批量推理
         batch_stats = inferencer_batch.batch_infer_with_multi_thresholds(
             img_idx_list=BATCH_TEST_IDXS,

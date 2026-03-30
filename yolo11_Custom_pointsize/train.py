@@ -12,7 +12,7 @@ from model import YOLO11ROIClassifier, calculate_2c_metrics, evaluate, load_yolo
 from loss import YOLO11ROIFocalLoss2C, YOLO11ROICOUNTLOSS, YOLO11ROIBCEWithLogitsLoss2C
 
 if __name__ == '__main__':
-    # 解决Windows多进程启动的bootstrap问题（核心修改2）
+    # 解决Windows多进程启动的bootstrap问题
     multiprocessing.freeze_support()
     # ===================== 1. 核心配置 =====================
     # 1.1 模型本身相关
@@ -36,11 +36,14 @@ if __name__ == '__main__':
     # 加载数据集的方式
     load_datasets = True
     # 1 指定数据集
-    DATASET_ROOT = r"H:\pycharm\yolov11\yolov11_proj3\Datasets_ROI_map400"       # 数据集路径
+    DATASET_ROOTS = [        # 数据集路径
+        r"H:\pycharm\yolov11\yolov11_proj3\Datasets_ROI_map400"
+
+    ]
     VAL_RATIO = 0.2         # 验证集的占比
     # 2 指定数据集和验证集
-    TRAIN_DATASETS = r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"
-    VAL_DATASETS = r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"
+    TRAIN_DATASETS = [r"H:\pycharm\yolov11\yolov11_proj1\datasets_16334"]
+    VAL_DATASETS = [r"H:\pycharm\yolov11\yolov11_proj1\datasets_global_test100"]
 
     # 1.3 损失函数和优化器相关
     LOSS_WEIGHT= [3.0, 1.0]    # 损失在两个类别上面的权重
@@ -67,7 +70,7 @@ if __name__ == '__main__':
         transforms.Normalize(mean=yolo11_mean, std=yolo11_std)          # 同时将像素值从 [0,255] 归一化到 [0,1]
     ])
 
-    # 验证集仅做基础变换（保证评估准确）
+    # 验证集仅做基础变换
     val_test_transform = transforms.Compose([
         transforms.ToPILImage(),
         transforms.ToTensor(),
@@ -78,36 +81,31 @@ if __name__ == '__main__':
     print("=== 正在加载数据集 ===")
     if load_datasets:       # 直接加载数据集
         print("直接加载数据集")
-        # 3.1 先创建一个临时数据集 仅用于计算长度和生成索引
-        temp_dataset = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=None)
-        dataset_size = len(temp_dataset)
+        # 3.1 实例化对象
+        train_dataset = ROI12ImageDataset(dataset_roots=DATASET_ROOTS, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
+        val_dataset = ROI12ImageDataset(dataset_roots=DATASET_ROOTS, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
+        dataset_size = len(train_dataset)
         val_size = int(VAL_RATIO * dataset_size)
         train_size = dataset_size - val_size
 
         # 3.2 生成随机且互斥的索引
-        # 注意：这里为了确保可复现性，可以固定一个seed，也可以不固定
         indices = torch.randperm(dataset_size).tolist()
         train_indices = indices[:train_size]
         val_indices = indices[train_size:]
 
-        # 3.3 实例化两个完全独立的 Dataset 对象
-        # 这样它们的 transform 互不干扰
-        train_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
-        val_dataset_full = ROI12ImageDataset(dataset_root=DATASET_ROOT, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
+        # 3.3 通过索引生成train_dataset, val_dataset
+        train_dataset = Subset(train_dataset, train_indices)
+        val_dataset = Subset(val_dataset, val_indices)
 
-        # 3.4 使用 Subset 根据索引包装
-        train_dataset = Subset(train_dataset_full, train_indices)
-        val_dataset = Subset(val_dataset_full, val_indices)
-
-        # 3.5 创建 DataLoader
+        # 3.4 创建 DataLoader
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS, pin_memory=False,
                                   drop_last=True)
         val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS, pin_memory=False,
                                 drop_last=True)
     else:       # 直接指定训练集和验证集
         print("直接指定训练集和验证集")
-        train_dataset = ROI12ImageDataset(dataset_root=TRAIN_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
-        val_dataset = ROI12ImageDataset(dataset_root=VAL_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
+        train_dataset = ROI12ImageDataset(dataset_roots=TRAIN_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=train_transform)
+        val_dataset = ROI12ImageDataset(dataset_roots=VAL_DATASETS, roi_img_size=ROI_IMG_SIZE, transform=val_test_transform)
         train_size = len(train_dataset)
         val_size = len(val_dataset)
 
@@ -212,30 +210,30 @@ if __name__ == '__main__':
             # ---------------------- MixUp增强开始 ----------------------
             if np.random.rand() < mixup_rate:
                 is_mixup = True
-                # 1. 从train_dataset中随机采样一个单样本
-                mixup_idx = np.random.choice(len(train_dataset))
-                roi_imgs2, cls_target2, conf_weight2 = train_dataset[mixup_idx]
-
-                # 2. 关键修复：扩展到批次维度（和原批次B保持一致）
-                B = roi_imgs.shape[0]  # 获取当前批次大小
-                roi_imgs2 = roi_imgs2.unsqueeze(0).repeat(B, 1, 1, 1, 1).to(DEVICE)  # [12,3,64,64] → [B,12,3,64,64]
-                cls_target2 = cls_target2.unsqueeze(0).repeat(B, 1).to(DEVICE)  # [12] → [B,12]
-                conf_weight2 = conf_weight2.unsqueeze(0).repeat(B, 1).to(DEVICE)
-
+                # 当前批次内随机索引配对
+                B = roi_imgs.shape[0]
+                # 生成当前批次的随机打乱索引
+                indices = torch.randperm(B).to(DEVICE)
+                # 随机插值系数
                 lam = np.random.beta(mixup_alpha, mixup_alpha)
-                roi_imgs_mix = lam * roi_imgs + (1 - lam) * roi_imgs2
-                conf_weight_mix = lam * conf_weight + (1 - lam) * conf_weight2
 
+                # 图像混合 + 标签混合
+                roi_imgs_mix = lam * roi_imgs + (1 - lam) * roi_imgs[indices]
+                cls_target2 = cls_target[indices]
+                conf_weight_mix = lam * conf_weight + (1 - lam) * conf_weight[indices]
+
+                # 前向传播
                 pred_logits = model(roi_imgs_mix)
+                # 混合损失
                 cls_loss1 = cls_loss_fn(pred_logits, cls_target, conf_weight_mix)
                 cls_loss2 = cls_loss_fn(pred_logits, cls_target2, conf_weight_mix)
                 cls_loss = lam * cls_loss1 + (1 - lam) * cls_loss2
                 count_loss = count_loss_fn(pred_logits, conf_weight_mix)
             else:
+                is_mixup = False
                 pred_logits = model(roi_imgs)
                 cls_loss = cls_loss_fn(pred_logits, cls_target, conf_weight)
                 count_loss = count_loss_fn(pred_logits, conf_weight)
-
             # ---------------------- MixUp增强结束 ----------------------
 
             total_loss = cls_loss + count_loss
