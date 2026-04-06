@@ -21,4 +21,6 @@ yolo11_zb_12roi_c2:结合zb的遮挡处理, 输入全局图像和r,t生成roi进
 
 yolo11_Custom_pointsize: 结合pointsize进行损失加权, 让模型敢给丰富图像信息(即高pointsize)的图片高置信度
 
+yolo11_Custom_atten: 引入注意力模块, yolo11_Custom定制模型的最终版
+
 merge_ws33: 上车代码
