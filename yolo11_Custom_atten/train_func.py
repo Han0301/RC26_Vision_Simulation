@@ -70,10 +70,9 @@ def evaluate(model, val_loader, loss_fn, device):
         for batch_idx, (roi_imgs, cls_target, conf_weight) in enumerate(tqdm(val_loader,desc="验证中",colour="red")):
             roi_imgs = roi_imgs.to(device)
             cls_target = cls_target.to(device)
-            conf_weight = conf_weight.to(device)
 
             pred_logits = model(roi_imgs)
-            loss = loss_fn(pred_logits, cls_target, conf_weight)
+            loss = loss_fn(pred_logits, cls_target)
 
             val_epoch_loss += loss.item()
             batch_count += 1

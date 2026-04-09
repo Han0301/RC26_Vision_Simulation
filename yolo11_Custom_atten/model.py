@@ -38,7 +38,7 @@ class LocalGrid_Attention(nn.Module):
     """局部网格注意力：建模相邻+指定ROI对的关联"""
     def __init__(self, dim=256, num_heads=4):
         super().__init__()
-        # 核心：多头自注意力层，batch_first=True 适配 [B, N, C] 格式
+        # 多头自注意力层，batch_first=True 适配 [B, N, C] 格式
         self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
         # 层归一化：稳定训练，适配注意力输出
         self.norm = nn.LayerNorm(dim)
@@ -166,6 +166,7 @@ class YOLO11ROIClassifier(nn.Module):
 
     def __init__(self, model_size="n", num_roi=12, num_classes=3, roi_size=64):
         super().__init__()
+        self.attn_weights = None
         self.model_size = model_size  # 模型尺寸（n/s/l）
         self.num_roi = num_roi  # ROI数量（固定12）
         self.num_classes = num_classes  # 分类数（固定3）

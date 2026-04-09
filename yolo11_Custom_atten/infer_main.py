@@ -19,6 +19,8 @@ class YOLO11ROIInferencer:
         # 设备配置
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_path = model_path
+        self.model_name = os.path.splitext( os.path.basename(model_path) )[0]
+
         # 核心参数
         self.model_size = model_size
         self.roi_size = roi_size
@@ -207,14 +209,14 @@ if __name__ == "__main__":
                                 label_path="H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179\labels\label_1.json",
                                 is_print=True
                                 ,is_save=True,
-                                save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\error.csv")
+                                save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\pre_error.csv")
 
     inferencer.infer_datasets(datasets_path=r"H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179",
                                 is_conf=True,
-                              conf_list=[0.9,0.8,0.7],
+                              conf_list=[0.9,0.85,0.80,0.75,0.7,0.65,0.6],
                               is_place=True,
                               is_point_size_weight=True,
-                              ps_w_thods=[0.3,0.2],
+                              ps_w_thods=[0.4,0.3,0.2,0.1],
                               is_save=True,
-                              save_path="H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\error__.csv"
+                              save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\ " + f"{inferencer.model_name}" + f"_datasets_real_p179"
                               )

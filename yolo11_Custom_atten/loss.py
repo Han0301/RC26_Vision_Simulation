@@ -12,10 +12,9 @@ class CountLoss(nn.Module):
         self.exist_count = exist_count
         self.weight = weight
 
-    def forward(self, pred_logits, conf_weight):
+    def forward(self, pred_logits):
         pred = torch.softmax(pred_logits, dim=-1)       # [B, 12, 2]
         pred_exist = pred[...,1]        # [B, 12 ] 每个roi落在1类的概率
-        pred_exist_weighted = pred_exist * conf_weight
         pred_exist_count = pred_exist.sum(dim=-1)       # 直接使用概率作为期望数量
         count_loss = torch.mean((pred_exist_count - self.exist_count) ** 2)     # mse 损失
         return self.weight * count_loss
@@ -33,7 +32,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.per_roi_loss = None
 
-    def forward(self, pred_logits, cls_target,conf_weight):
+    def forward(self, pred_logits, cls_target):
         B = pred_logits.shape[0]
         device = pred_logits.device
         self.alpha = self.alpha.to(device)
@@ -53,7 +52,7 @@ class FocalLoss(nn.Module):
             cls_target.reshape(-1)
         ).reshape(B, self.num_roi)  # [B,12]
         # 6. 加权Focal Loss
-        focal_loss = ce_loss * alpha_weight * focal_weight * conf_weight  # [B,12]
+        focal_loss = ce_loss * alpha_weight * focal_weight  # [B,12]
 
         # 7. 记录每个ROI的平均损失
         total_elem = torch.numel(focal_loss)

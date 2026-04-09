@@ -127,40 +127,44 @@ def write_txt(save_path, folder_path, pred_cls_np, pred_probs_np, labels=None, p
     file_exists = os.path.exists(save_path)
 
     # 追加模式打开文件，utf-8-sig兼容Excel
-    with open(save_path, "a", encoding="utf-8-sig", newline="") as f:
-        writer = csv.writer(f)
+    try:
+        with open(save_path, "a", encoding="utf-8-sig", newline="") as f:
+            writer = csv.writer(f)
 
-        # 首次创建文件：写入表头
-        if not file_exists:
-            writer.writerow([
-                "文件夹路径", "位置", "类别0置信度", "类别1置信度",
-                "预测类别", "真实类别", "point_size"
-            ])
+            # 首次创建文件：写入表头
+            if not file_exists:
+                writer.writerow([
+                    "文件夹路径", "位置", "类别0置信度", "类别1置信度",
+                    "预测类别", "真实类别", "point_size"
+                ])
 
-        # 写入12个位置的推理数据
-        for i in range(12):
-            conf0 = round(pred_probs_np[i][0], 3)
-            conf1 = round(pred_probs_np[i][1], 3)
-            pred_cls = pred_cls_np[i]
-            true_cls = labels[i] if labels is not None else ""
-            ps = point_size[i] if point_size is not None else ""
+            # 写入12个位置的推理数据
+            for i in range(12):
+                conf0 = round(pred_probs_np[i][0], 3)
+                conf1 = round(pred_probs_np[i][1], 3)
+                pred_cls = pred_cls_np[i]
+                true_cls = labels[i] if labels is not None else ""
+                ps = point_size[i] if point_size is not None else ""
 
-            writer.writerow([
-                folder_path, i + 1, conf0, conf1, pred_cls, true_cls, ps
-            ])
+                writer.writerow([
+                    folder_path, i + 1, conf0, conf1, pred_cls, true_cls, ps
+                ])
 
-        # 写入错误位置统计（可选）
-        if wrong_place is not None:
-            correct_num = 12 - len(wrong_place)
-            writer.writerow([
-                folder_path, "统计", "", "",
-                f"正确数: {correct_num}",
-                f"错误位置: {wrong_place}",
-                ""
-            ])
+            # 写入错误位置统计（可选）
+            if wrong_place is not None:
+                correct_num = 12 - len(wrong_place)
+                writer.writerow([
+                    folder_path, "统计", "", "",
+                    f"正确数: {correct_num}",
+                    f"错误位置: {wrong_place}",
+                    ""
+                ])
 
-        # 分隔行，区分不同文件夹结果
-        writer.writerow(["-" * 100, "", "", "", "", "", ""])
+            # 分隔行，区分不同文件夹结果
+            writer.writerow(["-" * 100, "", "", "", "", "", ""])
+    except PermissionError:
+        print(f"\n❌ 错误：文件被其他程序占用，请关闭 Excel/记事本 后重试！")
+        print(f"🔒 占用文件：{save_path}")
 
 def save_results(
         results: dict,
@@ -196,6 +200,16 @@ def save_results(
             writer.writerow(["📊 数据集统计总览"])
             writer.writerow(["总文件夹数", total_folders])
             writer.writerow(["总ROI数", total_roi])
+            total_correct = 0
+            total_samples = total_roi  # 总样本数 = 总ROI数
+            # 遍历所有结果，计算全局正确数
+            for res in results.values():
+                total_correct += sum(res["pred_cls_np"] == res["labels"])
+            # 计算全局正确率（防除0）
+            global_acc = total_correct / total_samples * 100 if total_samples != 0 else 0.0
+            # 写入全局统计
+            writer.writerow(["全局总正确数", total_correct])
+            writer.writerow(["全局综合正确率", f"{global_acc:.2f}%"])
             writer.writerow(["=" * 60])
             writer.writerow([])
 
@@ -220,7 +234,7 @@ def save_results(
                     acc_rate_0 = acc_count_0 / conf_count_0 * 100 if conf_count_0 != 0 else 0
                     acc_rate_1 = acc_count_1 / conf_count_1 * 100 if conf_count_1 != 0 else 0
                     writer.writerow([
-                        f"{conf:.1f}",
+                        f"{conf:.2f}",
                         f"{conf_count_0}", f"{conf_rate_0:.2f}", f"{acc_rate_0:.2f}",
                         f"{conf_count_1}", f"{conf_rate_1:.2f}", f"{acc_rate_1:.2f}"
                     ])
@@ -251,8 +265,16 @@ def save_results(
                     for i in range(12):
                         c, a = counts[i], accs[i]
                         rate_c = c / total_folders
-                        rate_a = a / total_folders
+                        rate_a = a / c
                         writer.writerow([i+1, c, f"{rate_c:.3f}", a, f"{rate_a:.3f}"])
+                    total_count = sum(counts)  # 总统计数量
+                    total_acc = sum(accs)  # 总正确数量
+                    # 计算整体准确率（避免除0错误）
+                    overall_acc = total_acc / total_count * 100 if total_count != 0 else 0.0
+                    # 另起一行写入整体统计结果
+                    writer.writerow([
+                        "整体统计", total_count, "-", total_acc, f"{overall_acc:.2f}%"
+                    ])
                     writer.writerow([])
                 writer.writerow(["-" * 80])
 

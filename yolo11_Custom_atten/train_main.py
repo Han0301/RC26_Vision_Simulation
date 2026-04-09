@@ -134,20 +134,19 @@ def train(model_config, train_config, dataset_config, loss_config):
                 # 图像混合 + 标签混合
                 roi_imgs_mix = lam * roi_imgs + (1 - lam) * roi_imgs[indices]
                 cls_target2 = cls_target[indices]
-                conf_weight_mix = lam * conf_weight + (1 - lam) * conf_weight[indices]
 
                 # 前向传播
                 pred_logits = model(roi_imgs_mix)
                 # 混合损失
-                cls_loss1 = cls_loss_fn(pred_logits, cls_target, conf_weight_mix)
-                cls_loss2 = cls_loss_fn(pred_logits, cls_target2, conf_weight_mix)
+                cls_loss1 = cls_loss_fn(pred_logits, cls_target)
+                cls_loss2 = cls_loss_fn(pred_logits, cls_target2)
                 cls_loss = lam * cls_loss1 + (1 - lam) * cls_loss2
-                count_loss = count_loss_fn(pred_logits, conf_weight_mix)
+                count_loss = count_loss_fn(pred_logits)
             else:
                 is_mixup = False
                 pred_logits = model(roi_imgs)
-                cls_loss = cls_loss_fn(pred_logits, cls_target, conf_weight)
-                count_loss = count_loss_fn(pred_logits, conf_weight)
+                cls_loss = cls_loss_fn(pred_logits, cls_target)
+                count_loss = count_loss_fn(pred_logits)
             # ---------------------- MixUp增强结束 ----------------------
 
             total_loss = cls_loss + count_loss
