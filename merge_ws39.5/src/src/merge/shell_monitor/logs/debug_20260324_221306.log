@@ -1,0 +1,160 @@
+2026-03-24 22:13:06,714 - MainThread - INFO - <module>:2587 - Starting application
+2026-03-24 22:13:06,784 - MainThread - INFO - __init__:1581 - Initializing ScriptRunnerApp
+2026-03-24 22:13:06,811 - MainThread - DEBUG - wrapper:46 - Entering create_welcome_tab
+2026-03-24 22:13:06,872 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:06,887 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:06,887 - MainThread - DEBUG - wrapper:49 - Exiting create_welcome_tab successfully
+2026-03-24 22:13:06,888 - MainThread - DEBUG - wrapper:46 - Entering load_scripts
+2026-03-24 22:13:07,004 - MainThread - DEBUG - wrapper:49 - Exiting load_scripts successfully
+2026-03-24 22:13:07,008 - MainThread - INFO - show_debug_info:1619 - 
+调试模式已启用
+日志文件: /home/maple/study3/merge_ws37/src/merge/shell_monitor/logs/debug_20260324_221306.log
+Python版本: 3.8.10 (default, Mar 18 2025, 20:04:55) 
+[GCC 9.4.0]
+平台: Linux-5.15.0-139-generic-x86_64-with-glibc2.29
+进程ID: 36122
+线程: MainThread
+
+2026-03-24 22:13:07,032 - MainThread - INFO - <module>:2603 - Starting main loop
+2026-03-24 22:13:07,887 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:07,906 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:08,055 - MainThread - DEBUG - wrapper:46 - Entering open_script_console
+2026-03-24 22:13:08,055 - MainThread - INFO - open_script_console:2336 - Opening console for roscore
+2026-03-24 22:13:08,055 - MainThread - INFO - __init__:75 - Creating console tab for roscore
+2026-03-24 22:13:08,112 - MainThread - DEBUG - wrapper:49 - Exiting open_script_console successfully
+2026-03-24 22:13:08,156 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:08,158 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:08,160 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:08,160 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:08,907 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:08,924 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:09,208 - MainThread - DEBUG - on_terminal_btn_press:327 - Terminal button pressed
+2026-03-24 22:13:09,280 - MainThread - DEBUG - on_terminal_btn_release:449 - Terminal button released after 71.755859375ms
+2026-03-24 22:13:09,290 - MainThread - DEBUG - wrapper:46 - Entering run_in_terminal
+2026-03-24 22:13:09,291 - MainThread - INFO - run_in_terminal:705 - Opening script in terminal: roscore
+2026-03-24 22:13:09,297 - MainThread - DEBUG - wrapper:49 - Exiting run_in_terminal successfully
+2026-03-24 22:13:09,368 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:09,368 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:09,370 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:09,370 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:09,472 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:09,472 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:09,925 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:09,940 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:10,940 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:10,959 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:11,959 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:11,970 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:12,970 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:12,985 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:13,055 - MainThread - DEBUG - wrapper:46 - Entering open_script_console
+2026-03-24 22:13:13,056 - MainThread - INFO - open_script_console:2336 - Opening console for merge_node
+2026-03-24 22:13:13,056 - MainThread - INFO - __init__:75 - Creating console tab for merge_node
+2026-03-24 22:13:13,102 - MainThread - DEBUG - wrapper:49 - Exiting open_script_console successfully
+2026-03-24 22:13:13,157 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:13,157 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:13,157 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:13,158 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:13,985 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:14,003 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:14,328 - MainThread - DEBUG - on_terminal_btn_press:327 - Terminal button pressed
+2026-03-24 22:13:14,399 - MainThread - DEBUG - on_terminal_btn_release:449 - Terminal button released after 71.142822265625ms
+2026-03-24 22:13:14,410 - MainThread - DEBUG - wrapper:46 - Entering run_in_terminal
+2026-03-24 22:13:14,410 - MainThread - INFO - run_in_terminal:705 - Opening script in terminal: merge_node
+2026-03-24 22:13:14,417 - MainThread - DEBUG - wrapper:49 - Exiting run_in_terminal successfully
+2026-03-24 22:13:14,465 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:14,465 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:14,465 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:14,465 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:14,566 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 22:13:14,567 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 22:13:15,003 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:15,017 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:16,017 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:16,032 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:17,033 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:17,048 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:18,048 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:18,066 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:19,067 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:19,087 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:20,087 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:20,103 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:21,103 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:21,121 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:22,122 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:22,139 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:23,139 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:23,156 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:24,156 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:24,175 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:25,175 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:25,192 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:26,193 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:26,211 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:27,211 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:27,229 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:28,229 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:28,247 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:29,247 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:29,259 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:30,259 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:30,271 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:31,271 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:31,286 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:32,287 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:32,303 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:33,303 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:33,318 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:34,318 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:34,334 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:35,334 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:35,354 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:36,354 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:36,371 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:37,371 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:37,390 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:38,390 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:38,403 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:39,404 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:39,420 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:40,420 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:40,435 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:41,435 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:41,452 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:42,452 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:42,468 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:43,468 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:43,488 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:44,489 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:44,508 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:45,508 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:45,529 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:46,529 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:46,547 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:47,547 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:47,563 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:48,563 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:48,580 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:49,581 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:49,599 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:50,599 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:50,618 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:51,619 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:51,638 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:52,638 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:52,655 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:53,655 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:53,674 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:54,674 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:54,693 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:55,693 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:55,707 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:56,708 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 22:13:56,726 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 22:13:57,096 - MainThread - DEBUG - wrapper:46 - Entering cleanup_and_exit
+2026-03-24 22:13:57,096 - MainThread - INFO - cleanup_and_exit:1639 - Starting cleanup and exit
+2026-03-24 22:13:57,096 - MainThread - INFO - cleanup_and_exit:1644 - Destroying main window
+2026-03-24 22:13:57,115 - MainThread - INFO - destroy:141 - Destroying console tab for roscore
+2026-03-24 22:13:57,122 - MainThread - INFO - destroy:141 - Destroying console tab for merge_node
+2026-03-24 22:13:57,131 - MainThread - INFO - cleanup_and_exit:1646 - Exiting application

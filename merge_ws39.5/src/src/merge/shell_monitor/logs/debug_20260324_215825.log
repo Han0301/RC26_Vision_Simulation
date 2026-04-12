@@ -1,0 +1,255 @@
+2026-03-24 21:58:25,942 - MainThread - INFO - <module>:2587 - Starting application
+2026-03-24 21:58:26,014 - MainThread - INFO - __init__:1581 - Initializing ScriptRunnerApp
+2026-03-24 21:58:26,074 - MainThread - DEBUG - wrapper:46 - Entering create_welcome_tab
+2026-03-24 21:58:26,132 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:26,151 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:26,151 - MainThread - DEBUG - wrapper:49 - Exiting create_welcome_tab successfully
+2026-03-24 21:58:26,152 - MainThread - DEBUG - wrapper:46 - Entering load_scripts
+2026-03-24 21:58:26,270 - MainThread - DEBUG - wrapper:49 - Exiting load_scripts successfully
+2026-03-24 21:58:26,276 - MainThread - INFO - show_debug_info:1619 - 
+调试模式已启用
+日志文件: /home/maple/study3/merge_ws37/src/merge/shell_monitor/logs/debug_20260324_215825.log
+Python版本: 3.8.10 (default, Mar 18 2025, 20:04:55) 
+[GCC 9.4.0]
+平台: Linux-5.15.0-139-generic-x86_64-with-glibc2.29
+进程ID: 31034
+线程: MainThread
+
+2026-03-24 21:58:26,301 - MainThread - INFO - <module>:2603 - Starting main loop
+2026-03-24 21:58:27,151 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:27,167 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:28,168 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:28,185 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:28,415 - MainThread - DEBUG - wrapper:46 - Entering open_script_console
+2026-03-24 21:58:28,415 - MainThread - INFO - open_script_console:2336 - Opening console for MF
+2026-03-24 21:58:28,416 - MainThread - INFO - __init__:75 - Creating console tab for MF
+2026-03-24 21:58:28,465 - MainThread - DEBUG - wrapper:49 - Exiting open_script_console successfully
+2026-03-24 21:58:28,517 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:28,518 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:28,519 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:28,519 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:29,185 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:29,204 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:30,204 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:30,224 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:30,703 - MainThread - DEBUG - wrapper:46 - Entering run_script
+2026-03-24 21:58:30,708 - ScriptExecutor-MF - DEBUG - wrapper:46 - Entering execute_script
+2026-03-24 21:58:30,708 - MainThread - DEBUG - wrapper:49 - Exiting run_script successfully
+2026-03-24 21:58:30,708 - ScriptExecutor-MF - INFO - execute_script:1032 - Starting script execution for MF
+2026-03-24 21:58:30,709 - ScriptExecutor-MF - INFO - execute_script:1065 - Using standard execution method for all scripts
+2026-03-24 21:58:30,709 - ScriptExecutor-MF - DEBUG - wrapper:46 - Entering execute_script_standard
+2026-03-24 21:58:30,709 - ScriptExecutor-MF - INFO - execute_script_standard:1235 - Using standard execution method for MF
+2026-03-24 21:58:30,732 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:30,732 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:31,224 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:31,244 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:32,244 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:32,262 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:33,263 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:33,281 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:34,281 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:34,301 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:35,301 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:35,320 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:36,320 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:36,339 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:37,339 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:37,356 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:38,357 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:38,374 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:39,375 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:39,390 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:40,390 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:40,405 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:41,405 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:41,424 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:42,424 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:42,440 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:43,440 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:43,456 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:44,457 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:44,474 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:45,474 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:45,493 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:46,493 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:46,512 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:47,512 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:47,530 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:48,530 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:48,549 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:49,550 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:49,567 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:50,567 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:50,580 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:51,581 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:51,600 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:52,600 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:52,619 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:53,620 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:53,638 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:54,638 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:54,654 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:55,655 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:55,670 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:56,670 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:56,688 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:56,932 - ScriptExecutor-MF - DEBUG - wrapper:49 - Exiting execute_script_standard successfully
+2026-03-24 21:58:56,933 - ScriptExecutor-MF - DEBUG - wrapper:49 - Exiting execute_script successfully
+2026-03-24 21:58:56,990 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:56,990 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:57,688 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:57,705 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:58,032 - MainThread - DEBUG - wrapper:46 - Entering open_script_console
+2026-03-24 21:58:58,032 - MainThread - INFO - open_script_console:2336 - Opening console for roscore
+2026-03-24 21:58:58,032 - MainThread - INFO - __init__:75 - Creating console tab for roscore
+2026-03-24 21:58:58,075 - MainThread - DEBUG - wrapper:49 - Exiting open_script_console successfully
+2026-03-24 21:58:58,133 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:58,133 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:58,133 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:58,134 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:58:58,705 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:58,723 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:59,723 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:58:59,740 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:58:59,760 - MainThread - DEBUG - wrapper:46 - Entering run_script
+2026-03-24 21:58:59,761 - ScriptExecutor-roscore - DEBUG - wrapper:46 - Entering execute_script
+2026-03-24 21:58:59,761 - ScriptExecutor-roscore - INFO - execute_script:1032 - Starting script execution for roscore
+2026-03-24 21:58:59,761 - MainThread - DEBUG - wrapper:49 - Exiting run_script successfully
+2026-03-24 21:58:59,762 - ScriptExecutor-roscore - INFO - execute_script:1065 - Using standard execution method for all scripts
+2026-03-24 21:58:59,762 - ScriptExecutor-roscore - DEBUG - wrapper:46 - Entering execute_script_standard
+2026-03-24 21:58:59,762 - ScriptExecutor-roscore - INFO - execute_script_standard:1235 - Using standard execution method for roscore
+2026-03-24 21:58:59,842 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:58:59,843 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:00,740 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:00,758 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:01,158 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,159 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,159 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,159 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,170 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,171 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,171 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,171 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,171 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,171 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,172 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,172 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,265 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,265 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,266 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,268 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,268 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,268 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,268 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,269 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,272 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,273 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,275 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,275 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,276 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,276 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,277 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,277 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,277 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,277 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,280 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,480 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,480 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,480 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,480 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,481 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,481 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,481 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,481 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,509 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,510 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,510 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,510 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,511 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,511 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,511 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,511 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,512 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:01,512 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:01,512 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:01,512 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:01,758 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:01,774 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:02,775 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:02,790 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:03,791 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:03,809 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:04,729 - MainThread - DEBUG - wrapper:46 - Entering open_script_console
+2026-03-24 21:59:04,729 - MainThread - INFO - open_script_console:2336 - Opening console for merge_node
+2026-03-24 21:59:04,729 - MainThread - INFO - __init__:75 - Creating console tab for merge_node
+2026-03-24 21:59:04,780 - MainThread - DEBUG - wrapper:49 - Exiting open_script_console successfully
+2026-03-24 21:59:04,809 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:04,826 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:04,830 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:04,830 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:04,830 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:04,830 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:05,826 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:05,844 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:06,845 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:06,860 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:07,860 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:07,878 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:08,776 - MainThread - DEBUG - wrapper:46 - Entering run_script
+2026-03-24 21:59:08,777 - ScriptExecutor-merge_node - DEBUG - wrapper:46 - Entering execute_script
+2026-03-24 21:59:08,778 - MainThread - DEBUG - wrapper:49 - Exiting run_script successfully
+2026-03-24 21:59:08,778 - ScriptExecutor-merge_node - INFO - execute_script:1032 - Starting script execution for merge_node
+2026-03-24 21:59:08,778 - ScriptExecutor-merge_node - INFO - execute_script:1065 - Using standard execution method for all scripts
+2026-03-24 21:59:08,778 - ScriptExecutor-merge_node - DEBUG - wrapper:46 - Entering execute_script_standard
+2026-03-24 21:59:08,778 - ScriptExecutor-merge_node - INFO - execute_script_standard:1235 - Using standard execution method for merge_node
+2026-03-24 21:59:08,783 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:08,783 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
+2026-03-24 21:59:08,878 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:08,894 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:09,895 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-03-24 21:59:09,909 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-03-24 21:59:10,227 - MainThread - DEBUG - wrapper:46 - Entering clean_rosmon_output
+2026-03-24 21:59:10,227 - MainThread - DEBUG - wrapper:49 - Exiting clean_rosmon_output successfully
+2026-03-24 21:59:10,227 - MainThread - DEBUG - wrapper:46 - Entering parse_ansi_text
+2026-03-24 21:59:10,228 - MainThread - DEBUG - wrapper:49 - Exiting parse_ansi_text successfully
