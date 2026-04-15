@@ -72,6 +72,7 @@ namespace Ten
         class supper2
         {
         public:
+            // ------------------------------------------------------------------------------------------- 初始化误差和变换
             supper2()
             {
                 //设置稳态误差
@@ -92,7 +93,8 @@ namespace Ten
                 _CAMERA_TRANSFORMATION_.camerainfo_.set_Extrinsic_Matrix(lidar_to_camera_transform_matrix_);
             }
 
-            // 填充 batch_images, 直接从相机和雷达的数据中设置
+            // ------------------------------------------------------------------------------------------- 填充 batch_images 的方式
+            // 1 填充 batch_images, 直接从相机和雷达的数据中设置
             void set_batch_images()
             {
                 batch_images.clear();
@@ -115,7 +117,7 @@ namespace Ten
                 batch_images.push_back(oee);
             }
 
-            // 填充 batch_images， 从datasets中设置
+            // 2 填充 batch_images， 从datasets中设置
             void set_debug_batch_images(
                 const std::vector<Ten::ORB::debug_orb_exhaust_element>& batch_images_labels
             )
@@ -127,6 +129,7 @@ namespace Ten
                 }
             }
 
+            // ------------------------------------------------------------------------------------------- 模型调用 和 后处理
             /**
              * @brief 设置place 和 per_loss, sure_loss
              * @param min_ps_w 能容忍的最小point_size_weight 权重大小， 默认为0.2
@@ -154,32 +157,33 @@ namespace Ten
 
                 // 设置图片
                 set_img(batch_images);
+                set_roi_images(roi_images, min_ps_w);
 
                 // 第一次 进行筛空
-                set_roi_images(roi_images, min_ps_w);
                 det_1 = super_init_.yolo_han2_.worker(roi_images);
                 set_place(det_1,place_1,sure_loss_1);
 
                 // retry
                 if (sure_loss_1 > min_sure_loss)
                 {
-                    int exist[12];  
                     for(int i = 0; i < 12; i++) {
-                        exist[i] = place_1[i];
+                        retry_exists[i] = place_1[i];
                     }
 
                     // 设置图片
-                    set_img(batch_images,exist);
+                    set_img(batch_images,retry_exists);
+                    set_roi_images(roi_images, min_ps_w);
 
                     // 进行推理处理
-                    set_roi_images(roi_images, min_ps_w);
                     det_2 = super_init_.yolo_han2_.worker(roi_images);
                     set_place(det_2,place_2,sure_loss_2);
+
+                    // 写入结果 place，per_loss, sure_loss
                     place = place_2;
                     set_per_loss(place,det_2,per_loss);
                     sure_loss = sure_loss_2;
                 }
-                else    // 没有第二次尝试， 直接使用第一次的结果
+                else    // 没有第二次尝试， 直接使用第一次的结果 写入结果 place，per_loss, sure_loss
                 {
                     place = place_1;
                     set_per_loss(place,det_1,per_loss);
@@ -194,7 +198,7 @@ namespace Ten
             }
 
             /**
-             * @brief 设置类别
+             * @brief 由分类模型来设置类别， 请确保 roi_images 已被填充
              * @param is_log 是否要设置日志保存
              * @param is_print 是否打印类别和对应置信度的标志位
             */
@@ -223,6 +227,7 @@ namespace Ten
                     std::vector<Ten::yolo::Detection> result = super_init_.yolo_detector_.worker(roi_images[i]);
 
                     confidence_[i] = result[0].conf_;
+
                     // 类别映射
                     if (result[0].cls_id_ == 1)
                     {
@@ -409,12 +414,13 @@ namespace Ten
                     }
                     else 
                     {
-                        break;      // 已处理但未填充一次， 本次还是无法填充， 直接退出，给了
+                        break;      // 已处理但未填充一次， 本次还是无法填充， 无法确认， 直接给了
                     }
                     
                 }
             }
 
+            // -------------------------------------------------------------------------------------------get 模块 和 print 调试打印
             // 返回整体损失
             const float get_sure_loss()
             {
@@ -439,15 +445,16 @@ namespace Ten
                 return classifier_;
             }
 
-            const std::vector<int> get_final_result()
-            {
-                return final_result;
-            }
-
             // 返回每个位置类别识别的置信度
             const std::vector<float> get_confidence_()
             {
                 return confidence_;
+            }
+
+            // 返回最终后处理结果
+            const std::vector<int> get_final_result()
+            {
+                return final_result;
             }
 
             // 返回roi_images最优roi12图像
@@ -462,6 +469,23 @@ namespace Ten
                 return super_init_.time_ps_w_;
             }
 
+            // 调试打印， 打印 两个模型的结果 和 后处理之后的最终结果
+            void print_post_cls()
+            {
+                for (int i =0;i < 12;i++)
+                {
+                    if (i + 1 < 10)
+                    {
+                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ",  place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
+                    }
+                    else
+                    {
+                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ", place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
+                    }
+                }
+            }
+
+        // ------------------------------------------------------------------------------------------- 私有变量 和 子功能
         private:
             Ten::Ten_worldtocamera camera_transformation_; //坐标点转换器，用于将世界坐标系下的点变换到当前坐标系，以及像素坐标系
             Ten::Ten_occlusion_handing zbuffer_; //zb处理器，用于处理遮挡关系
@@ -474,6 +498,7 @@ namespace Ten
             std::vector<cv::Mat> roi_images;                         // 给模型输入的最优图像
             Eigen::Matrix4d lidar_to_camera_transform_matrix_ = Eigen::Matrix4d::Identity(); //雷达到相机
             int default_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};      // 默认值
+            int retry_exists[12];                                   // retry 重新填充的值
 
             // 推理生成的数据
             std::vector<int> classifier_ = {0,0,0,0, 0,0,0,0, 0,0,0,0}; //每个位置对应的类别信息，由模型直接生成  0：未知 、1：R1 、2：R2 、3：fake 、4：空
@@ -483,6 +508,7 @@ namespace Ten
             float sure_loss;
             std::vector<int> final_result = {0,0,0,0, 0,0,0,0, 0,0,0,0};//每个位置对应的类别信息，综合两个模型结果生成， 0：未知 、1：R1 、2：R2 、3：fake 、4：空
 
+            // ------------------------------------------------------------------------------------------- 设置 图像 的功能部分
             /**
              * @brief 输入图像和r,t信息， 设置12个roi图像, 填充当前的box_lists_, 并保存到 time_box_lists_, 用于输入的 筛选
              * @param batch_images 一定批次的全局图像
@@ -522,7 +548,7 @@ namespace Ten
             }
 
             /**
-             * @brief 由 time_box_lists_和 time_ps_w_ 写入一组当前最优(结合ps_w筛选)的图像，用于输入的 预处理
+             * @brief 由 time_box_lists_和 time_ps_w_ 写入 roi_images， 仅在 set_roi12_place 中调用
              * @param roi_images 要写入的最优图像列表
              * @param min_ps_w 能容忍的最小point_size_weight 权重大小， 默认为0.2
             */
@@ -550,13 +576,13 @@ namespace Ten
                         std::cout << "[Error]from func supper2::process_img: box_lists.size() != 12 || time_ps_w[time].size() != 12" << std::endl;
                         return;
                     }
-                    for (int place = 0; place < 12; place++)
+                    for (int pl = 0; pl < 12; pl++)
                     {
-                        if (super_init_.time_ps_w_[time][place] > min_ps_w && super_init_.time_ps_w_[time][place] >= max_ps_w[place])
+                        if (super_init_.time_ps_w_[time][pl] > min_ps_w && super_init_.time_ps_w_[time][pl] >= max_ps_w[pl])
                         {
-                            roi_images[place] = box_lists[place].roi_image.clone();
-                            is_filled[place] = 1;
-                            max_ps_w[place] = super_init_.time_ps_w_[time][place];
+                            roi_images[pl] = box_lists[pl].roi_image.clone();
+                            is_filled[pl] = 1;
+                            max_ps_w[pl] = super_init_.time_ps_w_[time][pl];
                         }
                     }
                 }
@@ -583,6 +609,13 @@ namespace Ten
                 }
             }
 
+            // ------------------------------------------------------------------------------------------- set_roi12_place 的 后处理 和 调试打印
+            /**
+             * @brief 根据检测结果设置 place， 仅在 set_roi12_place 中调用
+             * @param dets 输入检测结果
+             * @param place 写入 place
+             * @param sure_loss 写入 本次配准的整体损失
+            */
             void set_place(
                 const std::vector<Ten::yolo::han2>& dets,
                 std::vector<int>& place,
@@ -655,8 +688,9 @@ namespace Ten
             }
 
             /**
-             * @brief 设置最终输出的per_loss
+             * @brief 设置最终输出的per_loss， 仅在 set_roi12_place 调用
              * @param place 输入最终的place
+             * @param det   检测置信度
              * @param per_loss 写入的每个位置损失
             */
             void set_per_loss(
@@ -688,6 +722,9 @@ namespace Ten
                 }
             }
 
+            /**
+             * @brief 调试打印 set_roi12_place 中的相关中间变量， roi12模型的处理过程， 仅在 set_roi12_place 通过标志位 调用
+            */
             void print_roi12_place(
                 const std::vector<int>& place_1,
                 const std::vector<int>& place_2,
@@ -747,7 +784,6 @@ namespace Ten
                 }
                 std::cout << std::endl;
                 std::cout << "sure_loss: " << sure_loss << std::endl;
-
             }
         };
         

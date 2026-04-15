@@ -855,13 +855,15 @@ void vision_test_super1()
             label = batch_images_labels[j].label;
         }
 
+        // 设置 本批次图像
         supper2_.set_debug_batch_images(batch_images_labels);
 
-        supper2_.set_roi12_place(0.2,0.08,false);
-        supper2_.set_cls(false,false);
+        // 模型推理和后处理
+        supper2_.set_roi12_place();
+        supper2_.set_cls();
         supper2_.set_post_cls();
 
-
+        // 取结果
         std::vector<int> final_result = supper2_.get_final_result();
         std::vector<int> cls = supper2_.get_classifier_();
         std::vector<int> place = supper2_.get_place();
@@ -869,40 +871,8 @@ void vision_test_super1()
         std::vector<float> per_loss = supper2_.get_per_loss();
         std::vector<std::vector<float>> time_ps_w = supper2_.get_time_ps_w_();
 
-        for (int i = 0 ; i < time_ps_w.size(); i++)
-        {
-            std::cout << "time_ps_w" << i + 1<< ": ";
-            for (int j = 0; j < time_ps_w[i].size();j++)
-            {
-                std::cout << time_ps_w[i][j] << ", ";
-            }
-            std::cout << std::endl;
-        }
-        for (int i =0;i < 12;i++)
-        {
-            std::cout << "pl: " << i + 1 << ", place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << cls[i] << ", conf: " << conf[i] << ", final_result: " << final_result[i]<< std::endl;
-        }
-
-        // std::cout << "cls: " << std::endl;
-        // for(auto& e : cls)
-        // {
-        //     std::cout << e << " ";
-        // }
-        // std::cout << std::endl;
-
-        // std::cout << "place: " << std::endl;
-        // for(auto& e : place)
-        // {
-        //     std::cout << e << " ";
-        // }
-        // std::cout << std::endl;
-
-        // std::cout << "final_result: " << std::endl;
-        // for(auto& e : final_result)
-        // {
-        //     std::cout << e << " ";
-        // }
-        // std::cout << std::endl;
+        // 调试打印
+        supper2_.print_post_cls();
 
         namespace fs = std::filesystem;
         std::vector<cv::Mat> roi_images = supper2_.get_roi_images();
