@@ -11,9 +11,21 @@ namespace Ten
     {
         // 用于存储多次在不同位置的 set_img 的记录
         struct super_init{
-
+            
             std::vector<std::vector<box>> time_box_lists_;
             std::vector<std::vector<float>> time_ps_w_;                 // 有效点的权重， 由该位置 point_size / 该行最大像素值 计算得到
+            std::string model_path = "/home/h/下载/yolo11s_roi12_atten_17/yolo11s_roi12_atten_17";
+            std::string device = "cpu";
+            std::vector<int> mapping_ = {1, 10, 11, 12, 13, 14, 15, 16, 17,18, 19, 2 ,20 ,21 ,22 ,23 ,24, 25 ,26 ,27 ,28 ,29, 3 ,30, 31,32, 4 ,5 ,6, 7, 8 ,9}; //yolocls模型类别映射关系
+            // 用到的模型
+            Ten::yolo::yolo_han2 yolo_han2_;        //yoloroi12处理器，用于筛空
+            Ten::yolo::yolo_v11_cls yolo_detector_; //yolo处理器，用于判断方块类别
+            
+            super_init() : yolo_han2_(model_path,device)
+                          ,yolo_detector_("/home/h/下载/卷轴分类1_仿真+现实_32类/best", "cpu", mapping_)        // 用【初始化列表】调用 yolo_han2_ 的构造函数
+            {
+               
+            }
 
             std::vector<float> set_ps_w(
                 std::vector<box>& box_lists
@@ -42,14 +54,20 @@ namespace Ten
                 {
                     for (int j = 0;j < 3;j++)
                     {
-                        ps_w[i * 3 + j] = (float)box_lists[i * 3 + j].point_size / max_point_size[i];
+                        if(max_point_size[i] == 0)
+                        {
+                            ps_w[i * 3 + j] = 0.0f;
+                        }
+                        else
+                        {
+                            ps_w[i * 3 + j] = (float)box_lists[i * 3 + j].point_size / max_point_size[i];
+                        }
                     }
                 }
                 return ps_w;
             }
 
         };
-
 
         class supper2
         {
@@ -72,30 +90,55 @@ namespace Ten
                 0.999379,  -0.0296971,  0.0189532,  0.336381,  
                 0.0         ,  0.0        ,  0.0        ,  1.0; 
                 _CAMERA_TRANSFORMATION_.camerainfo_.set_Extrinsic_Matrix(lidar_to_camera_transform_matrix_);
-               
+            }
+
+            // 填充 batch_images, 直接从相机和雷达的数据中设置
+            void set_batch_images()
+            {
+                batch_images.clear();
+                //获取图片
+                Ten::ORB::orb_exhaust_element oee;
+                camera_->camera_read().copyTo(oee.image_);
+                //获得雷达定位坐标
+                nav_msgs::Odometry odo = Ten::_TF_GET_.read_data();
+                Ten::XYZRPY lidar_of_world1 = Ten::Nav_Odometrytoxyzrpy(odo);
+                if(std::isnan(lidar_of_world1._rpy._yaw)) 
+                {
+                    return;
+                }
+                _CAMERA_TRANSFORMATION_.set_worldtolidar(lidar_of_world1);
+                Eigen::Matrix4d world_to_camera = _CAMERA_TRANSFORMATION_.getXYZRPY_matrix();
+                transverter_.set_Extrinsic_Matrix(world_to_camera);
+
+                transverter_.rvec().copyTo(oee.rvec_);
+                transverter_.tvec().copyTo(oee.tvec_);
+                batch_images.push_back(oee);
+            }
+
+            // 填充 batch_images， 从datasets中设置
+            void set_debug_batch_images(
+                const std::vector<Ten::ORB::debug_orb_exhaust_element>& batch_images_labels
+            )
+            {
+                batch_images.clear();
+                for (int j = 0; j < batch_images_labels.size(); j++)
+                {
+                    batch_images.push_back(batch_images_labels[j].oee);
+                }
             }
 
             /**
-             * @brief 输入batch_images
-             * @param batch_images 当前批次的两张全局图像和r,t
-             * @param model_path 用于初始化模型
-             * @param place 待写入的位置信息列表， 内部会初始化
-             * @param per_loss 每个位置的损失
-             * @param device 推理设备， 默认为cpu
+             * @brief 设置place 和 per_loss, sure_loss
              * @param min_ps_w 能容忍的最小point_size_weight 权重大小， 默认为0.2
-             * @param is_print 是否打印的标志位
+             * @param min_sure_loss 能容忍的最小整体损失平均， 低于这个阈值， 不会retry， 直接使用第一次的结果
+             * @param is_print 是否打印调试的标志位
             */
-            void manage_roi12(
-                const std::vector<Ten::ORB::debug_orb_exhaust_element>& batch_images,
-                const std::string model_path,
-                std::vector<int>& place,
-                std::vector<float>& per_loss,
-                const std::string device = "cpu",
+            void set_roi12_place(
                 const float min_ps_w = 0.2,
+                const float min_sure_loss = 0.08,
                 const bool is_print = false
             )
             {
-                Ten::superstratum::supper2 supper2_;
                 std::vector<int> place_1(12,-1);
                 std::vector<int> place_2(12,-1);
                 place.assign(12,-1);
@@ -104,19 +147,21 @@ namespace Ten
                 std::vector<float>per_loss_1;
                 std::vector<float>per_loss_2;
                 per_loss.assign(12,-1.0f);
+
+                // 表示整体的强行取到8个1的整体损失平均
                 float sure_loss_1;
                 float sure_loss_2;
-                float sure_loss;
 
                 // 设置图片
-                supper2_.set_img(batch_images);
+                set_img(batch_images);
 
-                // 进行推理处理
-                supper2_.process_img(model_path,det_1,device,min_ps_w);
-                supper2_.postprocess_dets(det_1,place_1,per_loss_1,sure_loss_1);
+                // 第一次 进行筛空
+                set_roi_images(roi_images, min_ps_w);
+                det_1 = super_init_.yolo_han2_.worker(roi_images);
+                set_place(det_1,place_1,sure_loss_1);
 
                 // retry
-                if (sure_loss_1 > 0.06)
+                if (sure_loss_1 > min_sure_loss)
                 {
                     int exist[12];  
                     for(int i = 0; i < 12; i++) {
@@ -124,33 +169,319 @@ namespace Ten
                     }
 
                     // 设置图片
-                    supper2_.set_img(batch_images,exist);
+                    set_img(batch_images,exist);
 
                     // 进行推理处理
-                    supper2_.process_img(model_path,det_2,device,min_ps_w);
-                    supper2_.postprocess_dets(det_2,place_2,per_loss_2,sure_loss_2);
-                    
-                    // 综合处理这两次的数据， 返回place,per_loss,sure_loss
-                    postprocess_retry_dets(place_1,place_2,det_1,det_2,per_loss_1,per_loss_2,sure_loss_1,sure_loss_2,place,per_loss,sure_loss);
+                    set_roi_images(roi_images, min_ps_w);
+                    det_2 = super_init_.yolo_han2_.worker(roi_images);
+                    set_place(det_2,place_2,sure_loss_2);
+                    place = place_2;
+                    set_per_loss(place,det_2,per_loss);
+                    sure_loss = sure_loss_2;
                 }
                 else    // 没有第二次尝试， 直接使用第一次的结果
                 {
-                    per_loss = per_loss_1;
                     place = place_1;
+                    set_per_loss(place,det_1,per_loss);
+                    sure_loss = sure_loss_1;
                 }
 
                 // 打印和调试部分
                 if (is_print)
                 {
-                    manage_roi12_print(place_1,place_2,det_1,det_2,sure_loss_1,sure_loss_2,place,per_loss,sure_loss);
+                    print_roi12_place(place_1,place_2,det_1,det_2,sure_loss_1,sure_loss_2,place,per_loss,sure_loss);
                 }
             }
 
-            super_init super_init_;
+            /**
+             * @brief 设置类别
+             * @param is_log 是否要设置日志保存
+             * @param is_print 是否打印类别和对应置信度的标志位
+            */
+            void set_cls(
+                bool is_log = false,
+                bool is_print = false
+            )
+            {
+                std::vector<Ten::box> box_lists_save;
+                classifier_.assign(12, 0);
+                confidence_.assign(12, 0.0f);
+
+                if (is_log)
+                {
+                    box_lists_save.resize(12);
+                    for(int i = 0; i < 12; i++)
+                    {
+                        box_lists_save[i].idx = i + 1;
+                        box_lists_save[i].roi_image = cv::Mat::zeros(160, 160, CV_8UC3);
+                    }
+                }
+
+                for(size_t i = 0; i < roi_images.size(); i++)
+                {
+                    //推理
+                    std::vector<Ten::yolo::Detection> result = super_init_.yolo_detector_.worker(roi_images[i]);
+
+                    confidence_[i] = result[0].conf_;
+                    // 类别映射
+                    if (result[0].cls_id_ == 1)
+                    {
+                        classifier_[i] = 1;
+                    }
+                    else if (result[0].cls_id_ >= 2 && result[0].cls_id_ <= 16)
+                    {
+                        classifier_[i] = 2;
+                    }
+                    else if (result[0].cls_id_ >= 17 && result[0].cls_id_ <= 31)
+                    {
+                        classifier_[i] = 3;
+                    }
+                    else if (result[0].cls_id_ == 32)
+                    {
+                        classifier_[i] = 4;
+                    }
+                    else
+                    {
+                        std::cout << "[error] set_cls: result[0].cls_id_ isn't in [1,32]" << std::endl;
+                    }
+                    if (is_log)
+                    {
+                        box_lists_save[i].cls = result[0].cls_id_;
+                        box_lists_save[i].confidence = result[0].conf_;
+                        roi_images[i].copyTo(box_lists_save[i].roi_image);
+                    }
+                    
+                }   
+                if (is_log)
+                {
+                    log_->record_image(box_lists_save);
+                }
+                if (is_print)
+                {
+                    if (confidence_.size() != classifier_.size())
+                    {
+                        std::cout << "[error] set_cls: confidence_.size() != classifier_.size()" << std::endl;
+                        return;
+                    }
+                    std::cout << "classifier_ | confidence_" << std::endl;
+                    for (int i = 0; i < classifier_.size(); i++)
+                    {
+                        std::cout << classifier_[i] << "    "  << confidence_[i] << std::endl;
+                    }
+                }
+            }
+            
+            /**
+             * 最终的后处理， 请确保已经调用set_roi12_place 和 set_cls， 结合筛空和分类模型的结果给出最终结果
+             * 设置 final_result
+             * @param limit_count_1 1类最大限制数量，默认为 3
+             * @param limit_count_2 2类最大限制数量，默认为 3
+             * @param limit_count_3 3类最大限制数量，默认为 2
+             * @param limit_count_4 4类最大限制数量，默认为 4
+            */
+            void set_post_cls(
+                const int limit_count_1 = 3,
+                const int limit_count_2 = 3,
+                const int limit_count_3 = 2,
+                const int limit_count_4 = 4
+            )
+            {
+                std::vector<int> limit_count = {limit_count_1,limit_count_2,limit_count_3,limit_count_4};   // 每个类别的限制数量上限
+                std::vector<int> now_count = {0,0,0,0};     // 每个类别确定的数量
+                std::vector<int> is_process(12, -1);         // 是否处理的标志位， -1表示未处理未填充， 0 表示已处理但未填充， 1 表示已处理已填充
+                final_result.assign(12, 0);
+
+                // ℹ 首次直接填充 高置信度 && 两个模型输出一致 && 对应位置有空位
+                for (int i = 0; i < classifier_.size(); i++)
+                {
+                    if (classifier_[i] != 4 && std::abs(confidence_[i] - 1) < 0.02 && place[i] != 0
+                        && now_count[ classifier_[i] - 1] < limit_count[ classifier_[i] - 1])       // 极高置信度且 不为空类 直接确定结果
+                    {
+                        final_result[i] = classifier_[i];
+                        now_count[ final_result[i] - 1] += 1;
+                        is_process[i] = 1;
+                    }
+                    if(classifier_[i] == 4 && std::abs(confidence_[i] - 1) < 0.02 && place[i] == 0
+                        && now_count[ classifier_[i] - 1] < limit_count[ classifier_[i] - 1])        // 极高置信度且 为空类 直接确定结果
+                    {
+                        final_result[i] = classifier_[i];
+                        now_count[ final_result[i] - 1] += 1;
+                        is_process[i] = 1;
+                    }                    
+                }
+                // ℹℹ 非极高置信度， 依次取当前最高进行处理
+                while (true)
+                {
+                    if (now_count == limit_count)
+                    {
+                        break;
+                    }
+                    // 1. 找到本次填充的最大置信度
+                    int max_place = -1;
+                    float max_conf = 0.0f;
+                    int isnt_filled_count = 0;      // 本次 未填充的数量
+                    // 1.1 优先考虑未处理 的最大置信度
+                    for (int i =0; i < classifier_.size(); i++)
+                    {
+                        if (confidence_[i] > max_conf && final_result[i] == 0 && is_process[i] == -1)
+                        {
+                            isnt_filled_count += 1;
+                            max_conf = confidence_[i];
+                            max_place = i;
+                        }
+                    }
+                    // 1.2 若 未处理的数量为0， max_place未赋值， 为-1， 此时考虑已经处理但未填充
+                    if (max_place == -1)
+                    {
+                        for (int i =0; i < classifier_.size(); i++)
+                        {
+                            if (confidence_[i] > max_conf && final_result[i] == 0 && is_process[i] == 0)
+                            {
+                                isnt_filled_count += 1;
+                                max_conf = confidence_[i];
+                                max_place = i;
+                            }
+                        }
+                    }
+                    // 1.3 全为 已处理已填充 直接退出
+                    if (max_place == -1) break;
+                    
+                    int max_cls = classifier_[max_place];
+                    // 2.1 两个模型输出一致 且 填充位置没有到对应位置上限， 直接填充
+                    if (max_cls == 4 && place[max_place] == 0 && now_count[ max_cls - 1 ] < limit_count[ max_cls - 1 ])
+                    {
+                        final_result[max_place] = max_cls;
+                        now_count[ max_cls - 1 ] += 1;
+                        is_process[max_place] = 1;
+                        continue;
+                    }
+                    else if (max_cls != 4 && place[max_place] == 1 && now_count[ max_cls - 1 ] < limit_count[ max_cls - 1 ])
+                    {
+                        final_result[max_place] = max_cls;
+                        now_count[ max_cls - 1 ] += 1;
+                        is_process[max_place] = 1;
+                        continue;
+                    }
+                    else    // 2.2 模型输出不一致 或者 填充位置到达对应位置上限
+                    /**
+                     * 对于模型输出结果不一致： 有以下几种情况
+                     *  model1(分类)     model2（筛空）
+                     *   1，2，3(损失小)    4            直接确认
+                     *   1，2，3           4(损失小)     直接确认
+                     *   4(损失小)         非4           直接确认
+                     *   4                非4(损失小)    无法确认
+                    */
+                    {
+                        // 2.2.1 model1 损失小， 直接确认结果
+                        if (1.0f - max_conf < per_loss[max_place] && now_count[ max_cls - 1 ] < limit_count[ max_cls - 1 ])
+                        {
+                            final_result[max_place] = max_cls;
+                            now_count[ max_cls - 1 ] += 1;
+                            is_process[max_place] = 1;
+                            continue;
+                        }
+                        // 2.2.2 model2 损失小，并且为空类 直接确认结果
+                        else if (1.0f - max_conf > per_loss[max_place] && place[max_place] == 0 && now_count[ 3 ] < limit_count[ 3 ])
+                        {
+                            final_result[max_place] = 4;
+                            now_count[ 3 ] += 1;
+                            is_process[max_place] = 1;
+                            continue;
+                        }
+                    }
+                    // 3 本次无法确认 或者 本次填入的类别已经满了, 但仅剩一个未填充， 直接根据数量关系填充
+                    if (isnt_filled_count == 1)
+                    {
+                        for (int i = 0;i < now_count.size(); i++)
+                        {
+                            if (limit_count[i] - now_count[i] == isnt_filled_count)
+                            {
+                                final_result[max_place] = i + 1;
+                                now_count[i] += 1;
+                                is_process[max_place] = 1;
+                            }
+                        }
+                    }
+                    // 4 走到这就 给了
+                    if (is_process[max_place] != 0)
+                    {
+                        is_process[max_place]  = 0;     // 0 表示已处理但未填充
+                    }
+                    else 
+                    {
+                        break;      // 已处理但未填充一次， 本次还是无法填充， 直接退出，给了
+                    }
+                    
+                }
+            }
+
+            // 返回整体损失
+            const float get_sure_loss()
+            {
+                return sure_loss;
+            }
+
+            // 返回每个位置损失
+            const std::vector<float> get_per_loss()
+            {
+                return per_loss;
+            }
+
+            // 返回每个位置是否有方块
+            const std::vector<int> get_place()
+            {
+                return place;
+            }
+
+            // 返回每个位置的类别
+            const std::vector<int> get_classifier_()
+            {
+                return classifier_;
+            }
+
+            const std::vector<int> get_final_result()
+            {
+                return final_result;
+            }
+
+            // 返回每个位置类别识别的置信度
+            const std::vector<float> get_confidence_()
+            {
+                return confidence_;
+            }
+
+            // 返回roi_images最优roi12图像
+            const std::vector<cv::Mat> get_roi_images()
+            {
+                return roi_images;
+            }
+
+            // 返回存储的历史ps_w
+            const std::vector<std::vector<float>> get_time_ps_w_()
+            {
+                return super_init_.time_ps_w_;
+            }
+
         private:
-            Eigen::Matrix4d lidar_to_camera_transform_matrix_ = Eigen::Matrix4d::Identity(); //雷达到相机
             Ten::Ten_worldtocamera camera_transformation_; //坐标点转换器，用于将世界坐标系下的点变换到当前坐标系，以及像素坐标系
             Ten::Ten_occlusion_handing zbuffer_; //zb处理器，用于处理遮挡关系
+            Ten::Ten_camera* camera_; //相机实例的引用
+            Ten::Ten_logger* log_; //日志实例的引用
+            Ten::Ten_camerainfo transverter_; //转换器，用于将4*4的变化矩阵转为rvec,tvec
+            super_init super_init_;         // 模型路径， 输入等参数加载器
+
+            std::vector<Ten::ORB::orb_exhaust_element> batch_images; // 原生图像数据， r,t
+            std::vector<cv::Mat> roi_images;                         // 给模型输入的最优图像
+            Eigen::Matrix4d lidar_to_camera_transform_matrix_ = Eigen::Matrix4d::Identity(); //雷达到相机
+            int default_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};      // 默认值
+
+            // 推理生成的数据
+            std::vector<int> classifier_ = {0,0,0,0, 0,0,0,0, 0,0,0,0}; //每个位置对应的类别信息，由模型直接生成  0：未知 、1：R1 、2：R2 、3：fake 、4：空
+            std::vector<float> confidence_ = {0,0,0,0, 0,0,0,0, 0,0,0,0}; //每个位置对应的置信度
+            std::vector<int> place = {-1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1}; //每个位置是否有方块
+            std::vector<float> per_loss = {-1.0f,-1.0f,-1.0f, -1.0f,-1.0f,-1.0f, -1.0f,-1.0f,-1.0f, -1.0f,-1.0f,-1.0f}; //每个位置是否有方块的损失
+            float sure_loss;
+            std::vector<int> final_result = {0,0,0,0, 0,0,0,0, 0,0,0,0};//每个位置对应的类别信息，综合两个模型结果生成， 0：未知 、1：R1 、2：R2 、3：fake 、4：空
 
             /**
              * @brief 输入图像和r,t信息， 设置12个roi图像, 填充当前的box_lists_, 并保存到 time_box_lists_, 用于输入的 筛选
@@ -158,14 +489,14 @@ namespace Ten
              * @param exist_boxes int12数组, 表示存在的列表
             */
             void set_img(
-                const std::vector<Ten::ORB::debug_orb_exhaust_element>& batch_images,
+                const std::vector<Ten::ORB::orb_exhaust_element>& batch_images,
                 int *exist_boxes = nullptr)
             {
                 for(size_t j = 0; j < batch_images.size(); j++)
                 {
                     //世界点和box_list的类对象，对里面数据进行处理
                     Ten::init_3d_box world_point;
-                    camera_transformation_.camerainfo_.set_RT(batch_images[j].oee.rvec_, batch_images[j].oee.tvec_);
+                    camera_transformation_.camerainfo_.set_RT(batch_images[j].rvec_, batch_images[j].tvec_);
                     camera_transformation_.pcl_transform_world_to_camera(world_point.pcl_LM_plum_object_points_, world_point.pcl_C_plum_object_points_, world_point.object_plum_2d_points_);
                     world_point.pcl_to_C();
 
@@ -176,11 +507,14 @@ namespace Ten
                     }
                     if (exist_boxes == nullptr) 
                     {
-                        int exist_boxes2[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
-                        exist_boxes = exist_boxes2;
+                        exist_boxes = default_boxes;
+                        zbuffer_.set_exist_boxes(exist_boxes);
                     }
-                    zbuffer_.set_exist_boxes(exist_boxes);
-                    zbuffer_.set_box_lists_(batch_images[j].oee.image_, world_point.C_object_plum_points_, world_point.object_plum_2d_points_, world_point.box_lists_);
+                    else
+                    {
+                        zbuffer_.set_exist_boxes(exist_boxes);
+                    }
+                    zbuffer_.set_box_lists_(batch_images[j].image_, world_point.C_object_plum_points_, world_point.object_plum_2d_points_, world_point.box_lists_);
 
                     super_init_.time_ps_w_.push_back(super_init_.set_ps_w(world_point.box_lists_));
                     super_init_.time_box_lists_.push_back(world_point.box_lists_);
@@ -188,21 +522,16 @@ namespace Ten
             }
 
             /**
-             * @brief 输入多组box_lists， 写入一组当前最优(结合ps_w筛选)的图像，用于输入的 预处理
-             * @param model_path 用于初始化模型
-             * @param det        待写入的检测结果
-             * @param device    推理设备， 默认为cpu
-             * @param min_ps_w 能容忍的最小point_size_weight 权重大小， 默认为0.1
+             * @brief 由 time_box_lists_和 time_ps_w_ 写入一组当前最优(结合ps_w筛选)的图像，用于输入的 预处理
+             * @param roi_images 要写入的最优图像列表
+             * @param min_ps_w 能容忍的最小point_size_weight 权重大小， 默认为0.2
             */
-            void process_img(
-                const std::string model_path,
-                std::vector<Ten::yolo::han2>& det,
-                const std::string device = "cpu",
+            void set_roi_images(
+                std::vector<cv::Mat>& roi_images,
                 const float min_ps_w = 0.2f
             )
             {
-                Ten::yolo::yolo_han2 yolo_han2_(model_path,device);
-                std::vector<cv::Mat>roi_images(12, cv::Mat::zeros(64, 64, CV_8UC3));
+                roi_images.assign(12, cv::Mat::zeros(64, 64, CV_8UC3));
 
                 std::vector<int> is_filled(12, 0);     // 表示是否填充图像列表的标志位
                 // 表示各位置最大ps_w
@@ -244,7 +573,7 @@ namespace Ten
                 }
                 if (!full_filled)
                 {
-                    std::cout << "[Error]from func supper2::process_img: isn't full_filled" << std::endl;
+                    std::cout << "[Error]from func supper2::set_roi_images: isn't full_filled" << std::endl;
                     std::cout << "isnt_filled: ";
                     for (int i = 0; i < isnt_filled_idx.size();i++)
                     {
@@ -252,39 +581,37 @@ namespace Ten
                     }
                     std::cout << std::endl;
                 }
-                det = yolo_han2_.worker(roi_images);
             }
 
-            void postprocess_dets(
-                std::vector<Ten::yolo::han2>& dets,
-                std::vector<int>& sure,
-                std::vector<float>& per_loss,
+            void set_place(
+                const std::vector<Ten::yolo::han2>& dets,
+                std::vector<int>& place,
                 float& sure_loss
             )
             {
                 sure_loss = 0.0f;
                 int sure_1 = 0;
-                per_loss.assign(12,0.0f);    // 衡量可信程度， loss在【0，1】，越小越好
-                sure.assign(12,-1);                 // 基本可信的列表
+                std::vector<float> per_los(12,0.0f);    // 衡量每个位置的可信程度， loss在【0，1】，越小越好
+                place.assign(12,-1);                     // 基本可信的列表
 
-                for (int place = 0; place < dets.size(); place++)
+                for (int pl = 0; pl < dets.size(); pl++)
                 {
                     // 填充 loss 列表
-                    if (dets[place].valid_exist_ > 0.5)
+                    if (dets[pl].valid_exist_ > 0.5)
                     {
-                        per_loss[place] = 2 * (1 - dets[place].valid_exist_);
+                        per_los[pl] = 2 * (1 - dets[pl].valid_exist_);
                     }
                     else
                     {
-                        per_loss[place] = 2 * dets[place].valid_exist_;
+                        per_los[pl] = 2 * dets[pl].valid_exist_;
                     }
                     // 填充 sure 列表
-                    if (per_loss[place] < 0.4)
+                    if (per_los[pl] < 0.4)
                     {
-                        sure[place] = (dets[place].valid_exist_ > 0.5)? 1 : -1;
-                        if (dets[place].valid_exist_ > 0.5)
+                        place[pl] = (dets[pl].valid_exist_ > 0.5)? 1 : -1;
+                        if (dets[pl].valid_exist_ > 0.5)
                         {
-                            sure_loss += per_loss[place];
+                            sure_loss += per_los[pl];
                             sure_1 += 1;
                         }
                     }
@@ -298,72 +625,70 @@ namespace Ten
                     // 找到当前的最大1类阈值
                     int max_place = -1;
                     float max_1_conf = 0.0f;
-                    for (int place = 0; place < dets.size(); place++)
+                    for (int pl = 0; pl < dets.size(); pl++)
                     {
-                        if (sure[place] == 1) continue;
-                        if (dets[place].valid_exist_ > max_1_conf)
+                        if (place[pl] == 1) continue;
+                        if (dets[pl].valid_exist_ > max_1_conf)
                         {
-                            max_1_conf = dets[place].valid_exist_;
-                            max_place = place;
+                            max_1_conf = dets[pl].valid_exist_;
+                            max_place = pl;
                         }
                     }
                     // 把目前认为最有可能为1 类的填充进sure
                     if (max_place != -1)
                     {
-                        sure[max_place] = 1;
+                        place[max_place] = 1;
                         sure_1 += 1;
-                        sure_loss += per_loss[max_place];
+                        sure_loss += per_los[max_place];
                     } 
                 }
 
                 // 赋0类
-                for (int place = 0; place < sure.size(); place++)
+                for (int pl = 0; pl < place.size(); pl++)
                 {
-                    if (sure[place] != 1)
+                    if (place[pl] != 1)
                     {
-                        sure[place] = 0;
+                        place[pl] = 0;
                     }
                 }
                 sure_loss = sure_loss / 8;
             }
 
-            void postprocess_retry_dets(
-                const std::vector<int>& place_1,
-                const std::vector<int>& place_2,
-                const std::vector<Ten::yolo::han2>& det_1,
-                const std::vector<Ten::yolo::han2>& det_2,
-                const std::vector<float>& per_loss_1,
-                const std::vector<float>& per_loss_2,
-                const float& sure_loss_1,
-                const float& sure_loss_2,
-                std::vector<int>& place,
-                std::vector<float>& per_loss,
-                float& sure_loss
+            /**
+             * @brief 设置最终输出的per_loss
+             * @param place 输入最终的place
+             * @param per_loss 写入的每个位置损失
+            */
+            void set_per_loss(
+                const std::vector<int>& place,
+                const std::vector<Ten::yolo::han2>& det,
+                std::vector<float>& per_loss
             )
             {
-                place.assign(12,-1);
-                sure_loss = 0.0f;
-                int set_count = 0;
+                per_loss.assign(12,-1.0f);
 
-                for (int i = 0;i < 12;i ++)
+                if (place.size() != 12 || det.size() != 12)
                 {
-                    if (per_loss_1[i] < per_loss_2[i])
+                    std::cout << "[error]: set_per_loss:  place.size() != 12 || det.size() != 12" << std::endl;
+                    return;
+                }
+                else
+                {
+                    for (int i = 0; i < place.size(); i++)
                     {
-                        per_loss[i] = per_loss_1[i];
-                        sure_loss += per_loss_1[i];
-                        place[i] = place_1[i];
-                    }
-                    else
-                    {
-                        per_loss[i] = per_loss_2[i];
-                        sure_loss += per_loss_2[i];
-                        place[i] = place_2[i];
+                        if (place[i] == 1) 
+                        {
+                            per_loss[i] = 1.0f - det[i].valid_exist_;
+                        }
+                        else
+                        {
+                            per_loss[i] = det[i].valid_exist_;
+                        }
                     }
                 }
-                sure_loss = sure_loss / 12;
             }
 
-            void manage_roi12_print(
+            void print_roi12_place(
                 const std::vector<int>& place_1,
                 const std::vector<int>& place_2,
                 const std::vector<Ten::yolo::han2>& det_1,
@@ -390,7 +715,7 @@ namespace Ten
                 std::cout << std::endl;
                 std::cout << "sure_loss: " << sure_loss_1 << std::endl;  
 
-                if (sure_loss_1 > 0.06)
+                if (sure_loss_1 > 0.08)
                 {
                     std::cout << "-----------retry--------------" << std::endl;
                     // 各个位置置信度
@@ -427,9 +752,5 @@ namespace Ten
         };
         
     }
-
-
 }
-
-
 #endif

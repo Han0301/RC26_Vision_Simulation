@@ -838,37 +838,83 @@ void vision_test_lidar_getttf()
 void vision_test_super1()
 {
     urcu_memb_register_thread();
-    Ten::superstratum::supper2 supper2_;
 
     std::vector<std::vector<Ten::ORB::debug_orb_exhaust_element>> datasets = Ten::ORB::load_exhaust_dataset("/home/h/图片/test_datas");
     size_t num = 0;
-    
+
     for(size_t i = 0; i < datasets.size(); i++)
     {
+        Ten::superstratum::supper2 supper2_;
         std::cout << "---------------------------------idx: " << i + 1 << std::endl;
         std::vector<int> label(12);
-        std::vector<Ten::ORB::debug_orb_exhaust_element> batch_images = datasets[i];
-        std::string model_path = "/home/h/下载/yolo11s_roi12_atten_17/yolo11s_roi12_atten_17";
-        std::vector<int> place;
-        std::vector<float> per_loss;
-        supper2_.manage_roi12(batch_images,model_path,place,per_loss,"cpu",0.2,true);
-        for (int j = 0; j < batch_images.size(); j++)
+        std::vector<Ten::ORB::debug_orb_exhaust_element> batch_images_labels = datasets[i];
+        std::vector<Ten::ORB::orb_exhaust_element> batch_images;
+
+        for (int j = 0; j < batch_images_labels.size(); j++)
         {
-            label = batch_images[j].label;
+            label = batch_images_labels[j].label;
         }
 
-        std::cout << "place: " << std::endl;
-        for(auto& e : place)
+        supper2_.set_debug_batch_images(batch_images_labels);
+
+        supper2_.set_roi12_place(0.2,0.08,false);
+        supper2_.set_cls(false,false);
+        supper2_.set_post_cls();
+
+
+        std::vector<int> final_result = supper2_.get_final_result();
+        std::vector<int> cls = supper2_.get_classifier_();
+        std::vector<int> place = supper2_.get_place();
+        std::vector<float> conf = supper2_.get_confidence_();
+        std::vector<float> per_loss = supper2_.get_per_loss();
+        std::vector<std::vector<float>> time_ps_w = supper2_.get_time_ps_w_();
+
+        for (int i = 0 ; i < time_ps_w.size(); i++)
         {
-            std::cout << e << " ";
+            std::cout << "time_ps_w" << i + 1<< ": ";
+            for (int j = 0; j < time_ps_w[i].size();j++)
+            {
+                std::cout << time_ps_w[i][j] << ", ";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-        std::cout << "label: " << std::endl;
-        for(auto& e : label)
+        for (int i =0;i < 12;i++)
         {
-            std::cout << e << " ";
+            std::cout << "pl: " << i + 1 << ", place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << cls[i] << ", conf: " << conf[i] << ", final_result: " << final_result[i]<< std::endl;
         }
-        std::cout << std::endl;
+
+        // std::cout << "cls: " << std::endl;
+        // for(auto& e : cls)
+        // {
+        //     std::cout << e << " ";
+        // }
+        // std::cout << std::endl;
+
+        // std::cout << "place: " << std::endl;
+        // for(auto& e : place)
+        // {
+        //     std::cout << e << " ";
+        // }
+        // std::cout << std::endl;
+
+        // std::cout << "final_result: " << std::endl;
+        // for(auto& e : final_result)
+        // {
+        //     std::cout << e << " ";
+        // }
+        // std::cout << std::endl;
+
+        namespace fs = std::filesystem;
+        std::vector<cv::Mat> roi_images = supper2_.get_roi_images();
+        for (int j = 0; j < roi_images.size(); j++)
+        {
+            std::string save_dir = "/home/h/图片/test_datas/r/" + to_string(i + 1);
+            if (!fs::exists(save_dir)) {
+                fs::create_directories(save_dir);
+            }
+            std::string save_path = save_dir + "/" + to_string(j + 1) + ".png";
+            cv::imwrite(save_path, roi_images[j]);
+        }
 
         int flag = 0;
         for(size_t j = 0; j < label.size(); j++)
