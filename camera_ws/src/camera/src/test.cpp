@@ -23,7 +23,7 @@ void test1(ros::NodeHandle& nh)
     Ten::Plane_FitLocator::Ten_debug_pcl _DEBUG_PCL_;
     Ten::Plane_FitLocator::Ten_pre_pcl _PRE_PCL_;
     Ten::Plane_FitLocator::Ten_set_pcl _SET_PCL_;
-
+    Ten::Plane_FitLocator::Ten_post_pcl _POST_PCL_;
     // 点云
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -56,13 +56,22 @@ void test1(ros::NodeHandle& nh)
         bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud);
         _PRE_PCL_.computeCenterAndNormal(plane_cloud);
 
+
+        pcl::ModelCoefficients::Ptr plane_coeffs = _PRE_PCL_.get_plane_coeffs();
+        Ten::Plane_FitLocator::Plane_Info plane_info = _PRE_PCL_.get_plane_info(ret);
+        // 方形拟合
+        _POST_PCL_.fitPlaneQuadrilateral(plane_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat());
+        _PRE_PCL_.set_plane_info_corner(_POST_PCL_.get_plane_corner());
+
+        plane_info = _PRE_PCL_.get_plane_info(ret);
         // 发布调试图像和点云,tf话题
         cv::Mat debug_image;
-        _DEBUG_PCL_.debug_rgb_image(frame.bgr_image,_PRE_PCL_.get_plane_info(ret), color_intr,debug_image);
+        // _DEBUG_PCL_.debug_rgb_image(frame.bgr_image,plane_info, color_intr,debug_image);
+        _DEBUG_PCL_.debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
         cv::imshow("bgr_frame", debug_image);
 
         _DEBUG_PCL_.publish_pointcloud(plane_cloud);          // 发布点云
-        _DEBUG_PCL_.publish_PlaneTF(_PRE_PCL_.get_plane_info(ret));
+        _DEBUG_PCL_.publish_PlaneTF(plane_info);
 
 
         char key = cv::waitKey(1);

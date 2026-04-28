@@ -64,7 +64,6 @@ namespace Ten
         int center_y = _h / 2;
         // 直接从realsense接口获取米级深度（比opencv转算更准）
         float z_distance = depth_frame.get_distance(center_x, center_y);
-        std::cout << "✅ 相机坐标系Z轴（中心深度）= " << z_distance << " 米" << std::endl;
         return frame;
     }
 

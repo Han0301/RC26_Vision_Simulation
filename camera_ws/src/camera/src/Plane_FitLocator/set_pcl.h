@@ -8,6 +8,9 @@
 #include <pcl/point_types.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 
+#define CloudDepth_low 100
+#define CloudDepth_high 1000
+
 namespace Ten
 {
 namespace Plane_FitLocator
@@ -21,15 +24,11 @@ public:
      * @param depth_frame       原生深度帧
      * @param color_intr        彩色相机内参
      * @param pcl_cloud         输出的pcl_cloud点云
-     * @param CloudDepth_low    能接受的点云处理的最低距离(mm)， 小于这个距离直接过滤
-     * @param CloudDepth_high   能接受的点云处理的最高距离(mm)， 大于这个距离直接过滤
     */
     void set_Pcl_Cloud(
-    const std::shared_ptr<rs2::depth_frame>& depth_frame,
+        const std::shared_ptr<rs2::depth_frame>& depth_frame,
         const rs2_intrinsics& color_intr,
-        pcl::PointCloud<pcl::PointXYZ>::Ptr& pcl_cloud,
-        const int CloudDepth_low = 100,
-        const int CloudDepth_high = 1000
+        pcl::PointCloud<pcl::PointXYZ>::Ptr& pcl_cloud
     )
     {
         pcl_cloud->clear();

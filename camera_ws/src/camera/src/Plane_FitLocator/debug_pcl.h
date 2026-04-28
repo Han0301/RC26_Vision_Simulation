@@ -75,9 +75,9 @@ public:
         tf2::Quaternion q;
         // 传入：roll, pitch, yaw（你的结构体 RPY）
         q.setRPY(
-            plane_info.plane_normal._roll,
-            plane_info.plane_normal._pitch,
-            plane_info.plane_normal._yaw
+            plane_info.plane_euler._roll,
+            plane_info.plane_euler._pitch,
+            plane_info.plane_euler._yaw
         );
         // 填充四元数到 TF 消息
         tf_msg.transform.rotation.x = q.x();
@@ -129,6 +129,79 @@ public:
             cv::putText(output_image, coord_text, cv::Point(u+10, v + 20), 
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
         }
+    }
+
+    /**
+     * @brief 调试图像：绘制平面四边形4个角点 + 闭合边框
+     * @param input_image 输入RGB图像
+     * @param plane_info 包含平面中心、4个角点的结构体
+     * @param color_intr 彩色相机内参
+     * @param output_image 输出调试图像
+     */
+    void debug_plane_quadrilateral(
+        const cv::Mat& input_image,
+        const Plane_Info& plane_info,
+        const rs2_intrinsics& color_intr, 
+        cv::Mat& output_image
+    )
+    {
+        // 1. 复制原图
+        output_image = input_image.clone();
+        // 获取4个3D角点
+        const std::vector<Eigen::Vector3d>& corners = plane_info.plane_corner;
+        // 存储投影后的2D像素点
+        std::vector<cv::Point> pixel_points;
+
+        // 2. 遍历所有角点，3D→2D投影
+        for (int i = 0; i < corners.size(); i++)
+        {
+            const Eigen::Vector3d& pt_3d = corners[i];
+            // 转换为RealSense投影需要的格式
+            float point3d[3] = {(float)pt_3d.x(), (float)pt_3d.y(), (float)pt_3d.z()};
+            float pixel[2] = {0};
+            // 3D相机坐标 → 2D像素坐标
+            rs2_project_point_to_pixel(pixel, &color_intr, point3d);
+            
+            int u = cvRound(pixel[0]);
+            int v = cvRound(pixel[1]);
+            pixel_points.emplace_back(u, v);
+        }
+
+        // 3. 绘制：4个角点（蓝色实心圆）+ 闭合四边形（绿色边框）
+        for (int i = 0; i < pixel_points.size(); i++)
+        {
+            cv::Point p = pixel_points[i];
+            // 越界判断，防止绘图崩溃
+            if (p.x < 0 || p.x >= output_image.cols || p.y < 0 || p.y >= output_image.rows)
+                continue;
+
+            // 绘制角点：蓝色圆
+            cv::circle(output_image, p, 6, cv::Scalar(255, 0, 0), -1);
+            // 标注角点序号
+            cv::putText(output_image, std::to_string(i+1), cv::Point(p.x+5, p.y),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
+
+            // 绘制闭合边框：连接当前点和下一个点，最后一个点连接第一个点
+            int next_idx = (i + 1) % pixel_points.size();
+            cv::Point p_next = pixel_points[next_idx];
+            if (p_next.x >= 0 && p_next.x < output_image.cols && p_next.y >= 0 && p_next.y < output_image.rows)
+            {
+                cv::line(output_image, p, p_next, cv::Scalar(0, 255, 0), 2);
+            }
+        }
+
+        // 4. 绘制平面中心（复用你原有逻辑，红色圆）
+        Eigen::Vector3d center_3d = plane_info.plane_center;
+        float c_point3d[3] = {(float)center_3d.x(), (float)center_3d.y(), (float)center_3d.z()};
+        float c_pixel[2] = {0};
+        rs2_project_point_to_pixel(c_pixel, &color_intr, c_point3d);
+        cv::Point center_p(cvRound(c_pixel[0]), cvRound(c_pixel[1]));
+        if (center_p.x >=0 && center_p.x < output_image.cols && center_p.y >=0 && center_p.y < output_image.rows)
+        {
+            cv::circle(output_image, center_p, 8, cv::Scalar(0, 0, 255), -1);
+        }
+
+        std::cout << "✅ 四边形调试图像绘制完成" << std::endl;
     }
 
 
