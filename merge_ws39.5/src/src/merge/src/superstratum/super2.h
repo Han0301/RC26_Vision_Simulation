@@ -13,7 +13,7 @@ namespace Ten
         struct super_init{
             
             std::vector<std::vector<box>> time_box_lists_;
-            std::vector<std::vector<float>> time_ps_w_;                 // 有效点的权重， 由该位置 point_size / 该行最大像素值 计算得到
+            std::vector<std::vector<float>> time_ps_;                 // 有效点的权重， 由该位置 point_size / 该行最大像素值 计算得到
             std::string model_path = "/home/h/下载/yolo11s_roi12_atten_17/yolo11s_roi12_atten_17";
             std::string device = "cpu";
             std::vector<int> mapping_ = {1, 10, 11, 12, 13, 14, 15, 16, 17,18, 19, 2 ,20 ,21 ,22 ,23 ,24, 25 ,26 ,27 ,28 ,29, 3 ,30, 31,32, 4 ,5 ,6, 7, 8 ,9}; //yolocls模型类别映射关系
@@ -26,47 +26,27 @@ namespace Ten
             {
                
             }
-
-            std::vector<float> set_ps_w(
+            std::vector<float> set_ps_(
                 std::vector<box>& box_lists
             )
             {
-                std::vector<float>ps_w(12,0.00f);
+                std::vector<float>ps_(12,0.00f);
                 if (box_lists.size() != 12)
                 {
-                    std::cout << "[Error]from func set_ps_w: box_lists.size() != 12, make sure box_lists is set" << std::endl;
-                    return ps_w;
+                    std::cout << "[Error]from func set_ps_: box_lists.size() != 12, make sure box_lists is set" << std::endl;
+                    return ps_;
                 }
-                // 找到每行的最大值
-                std::vector<int>max_point_size = {0,0,0,0};
-                for(int i = 0;i < 4; i++)
-                {
-                    for (int j = 0;j < 3;j++)
-                    {
-                        if (box_lists[i * 3 + j].point_size > max_point_size[i])
-                        {
-                            max_point_size[i] = box_lists[i * 3 + j].point_size;
-                        }
-                    }
-                }
-                // 填充 point_size_weight 字段
-                for(int i = 0;i < 4; i++)
-                {
-                    for (int j = 0;j < 3;j++)
-                    {
-                        if(max_point_size[i] == 0)
-                        {
-                            ps_w[i * 3 + j] = 0.0f;
-                        }
-                        else
-                        {
-                            ps_w[i * 3 + j] = (float)box_lists[i * 3 + j].point_size / max_point_size[i];
-                        }
-                    }
-                }
-                return ps_w;
-            }
 
+                // 填充 point_size_ 字段
+                for(int i = 0;i < 4; i++)
+                {
+                    for (int j = 0;j < 3;j++)
+                    {
+                        ps_[i * 3 + j] = (float)box_lists[i * 3 + j].point_size;
+                    }
+                }
+                return ps_;
+            }
         };
 
         class supper2
@@ -288,7 +268,8 @@ namespace Ten
                 const int limit_count_1 = 3,
                 const int limit_count_2 = 3,
                 const int limit_count_3 = 2,
-                const int limit_count_4 = 4
+                const int limit_count_4 = 4,
+                bool is_count_infer = true
             )
             {
                 std::vector<int> limit_count = {limit_count_1,limit_count_2,limit_count_3,limit_count_4};   // 每个类别的限制数量上限
@@ -377,16 +358,16 @@ namespace Ten
                      *   4                非4(损失小)    无法确认
                     */
                     {
-                        // 2.2.1 model1 损失小， 直接确认结果
-                        if (1.0f - max_conf < per_loss[max_place] && now_count[ max_cls - 1 ] < limit_count[ max_cls - 1 ])
-                        {
-                            final_result[max_place] = max_cls;
-                            now_count[ max_cls - 1 ] += 1;
-                            is_process[max_place] = 1;
-                            continue;
-                        }
-                        // 2.2.2 model2 损失小，并且为空类 直接确认结果
-                        else if (1.0f - max_conf > per_loss[max_place] && place[max_place] == 0 && now_count[ 3 ] < limit_count[ 3 ])
+                       // 2.2.1 model1 损失小， 直接确认结果
+                        // if (1.0f - max_conf < per_loss[max_place] && now_count[ max_cls - 1 ] < limit_count[ max_cls - 1 ])
+                        // {
+                        //     final_result[max_place] = max_cls;
+                        //     now_count[ max_cls - 1 ] += 1;
+                        //     is_process[max_place] = 1;
+                        //     continue;
+                        // }
+                        // 2.2.2 model2 损失小，并且为空类 直接确认结果          尽可能相信筛空模型对空的结果
+                        if (1.0f - max_conf > per_loss[max_place] && place[max_place] == 0 && now_count[ 3 ] < limit_count[ 3 ])
                         {
                             final_result[max_place] = 4;
                             now_count[ 3 ] += 1;
@@ -394,19 +375,24 @@ namespace Ten
                             continue;
                         }
                     }
-                    // 3 本次无法确认 或者 本次填入的类别已经满了, 但仅剩一个未填充， 直接根据数量关系填充
-                    if (isnt_filled_count == 1)
-                    {
-                        for (int i = 0;i < now_count.size(); i++)
+
+                    if (is_count_infer)
+                    {                    
+                        // 3 本次无法确认 或者 本次填入的类别已经满了, 但仅剩一个未填充， 直接根据数量关系填充
+                        if (isnt_filled_count == 1)
                         {
-                            if (limit_count[i] - now_count[i] == isnt_filled_count)
+                            for (int i = 0;i < now_count.size(); i++)
                             {
-                                final_result[max_place] = i + 1;
-                                now_count[i] += 1;
-                                is_process[max_place] = 1;
+                                if (limit_count[i] - now_count[i] == isnt_filled_count)
+                                {
+                                    final_result[max_place] = i + 1;
+                                    now_count[i] += 1;
+                                    is_process[max_place] = 1;
+                                }
                             }
                         }
                     }
+
                     // 4 走到这就 给了
                     if (is_process[max_place] != 0)
                     {
@@ -416,7 +402,6 @@ namespace Ten
                     {
                         break;      // 已处理但未填充一次， 本次还是无法填充， 无法确认， 直接给了
                     }
-                    
                 }
             }
 
@@ -463,10 +448,10 @@ namespace Ten
                 return roi_images;
             }
 
-            // 返回存储的历史ps_w
-            const std::vector<std::vector<float>> get_time_ps_w_()
+            // 返回存储的历史 time_ps_
+            const std::vector<std::vector<float>> get_time_ps_()
             {
-                return super_init_.time_ps_w_;
+                return super_init_.time_ps_;
             }
 
             // 调试打印， 打印 两个模型的结果 和 后处理之后的最终结果
@@ -476,11 +461,11 @@ namespace Ten
                 {
                     if (i + 1 < 10)
                     {
-                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ",  place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
+                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ",  place: " << place[i] << ", per_loss: " << per_loss[i] << ", cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
                     }
                     else
                     {
-                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ", place: " << place[i] << ",per_loss: " << per_loss[i] << ",cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
+                        std::cout << std::fixed << std::setprecision(3) << "pl: " << i + 1 << ", place: " << place[i] << ", per_loss: " << per_loss[i] << ", cls: " << classifier_[i] << ", conf: " << confidence_[i] << ", final_result: " << final_result[i]<< std::endl;
                     }
                 }
             }
@@ -493,6 +478,7 @@ namespace Ten
             Ten::Ten_logger* log_; //日志实例的引用
             Ten::Ten_camerainfo transverter_; //转换器，用于将4*4的变化矩阵转为rvec,tvec
             super_init super_init_;         // 模型路径， 输入等参数加载器
+            Ten::init_3d_box world_point;
 
             std::vector<Ten::ORB::orb_exhaust_element> batch_images; // 原生图像数据， r,t
             std::vector<cv::Mat> roi_images;                         // 给模型输入的最优图像
@@ -520,8 +506,8 @@ namespace Ten
             {
                 for(size_t j = 0; j < batch_images.size(); j++)
                 {
+                    world_point = Ten::init_3d_box();
                     //世界点和box_list的类对象，对里面数据进行处理
-                    Ten::init_3d_box world_point;
                     camera_transformation_.camerainfo_.set_RT(batch_images[j].rvec_, batch_images[j].tvec_);
                     camera_transformation_.pcl_transform_world_to_camera(world_point.pcl_LM_plum_object_points_, world_point.pcl_C_plum_object_points_, world_point.object_plum_2d_points_);
                     world_point.pcl_to_C();
@@ -529,8 +515,9 @@ namespace Ten
                     if (j == 0)
                     {
                         super_init_.time_box_lists_.clear();
-                        super_init_.time_ps_w_.clear();
+                        super_init_.time_ps_.clear();
                     }
+
                     if (exist_boxes == nullptr) 
                     {
                         exist_boxes = default_boxes;
@@ -541,8 +528,8 @@ namespace Ten
                         zbuffer_.set_exist_boxes(exist_boxes);
                     }
                     zbuffer_.set_box_lists_(batch_images[j].image_, world_point.C_object_plum_points_, world_point.object_plum_2d_points_, world_point.box_lists_);
-
-                    super_init_.time_ps_w_.push_back(super_init_.set_ps_w(world_point.box_lists_));
+                    
+                    super_init_.time_ps_.push_back(super_init_.set_ps_(world_point.box_lists_));
                     super_init_.time_box_lists_.push_back(world_point.box_lists_);
                 }
             }
@@ -561,9 +548,9 @@ namespace Ten
 
                 std::vector<int> is_filled(12, 0);     // 表示是否填充图像列表的标志位
                 // 表示各位置最大ps_w
-                std::vector<float> max_ps_w(12, min_ps_w);     
+                std::vector<float> max_ps_(12, min_ps_w);     
                 
-                if (super_init_.time_ps_w_.size() != super_init_.time_box_lists_.size()) {
+                if (super_init_.time_ps_.size() != super_init_.time_box_lists_.size()) {
                     std::cout << "[Error] time_ps_w.size() != time_box_lists.size()" << std::endl;
                     return;
                 }
@@ -571,18 +558,18 @@ namespace Ten
                 for (int time = 0; time < super_init_.time_box_lists_.size(); time++)
                 {
                     std::vector<box>& box_lists = super_init_.time_box_lists_[time];
-                    if (box_lists.size() != 12 || super_init_.time_ps_w_[time].size() != 12)
+                    if (box_lists.size() != 12 || super_init_.time_ps_[time].size() != 12)
                     {
                         std::cout << "[Error]from func supper2::process_img: box_lists.size() != 12 || time_ps_w[time].size() != 12" << std::endl;
                         return;
                     }
                     for (int pl = 0; pl < 12; pl++)
                     {
-                        if (super_init_.time_ps_w_[time][pl] > min_ps_w && super_init_.time_ps_w_[time][pl] >= max_ps_w[pl])
+                        if (super_init_.time_ps_[time][pl] > min_ps_w && super_init_.time_ps_[time][pl] >= max_ps_[pl])
                         {
                             roi_images[pl] = box_lists[pl].roi_image.clone();
                             is_filled[pl] = 1;
-                            max_ps_w[pl] = super_init_.time_ps_w_[time][pl];
+                            max_ps_[pl] = super_init_.time_ps_[time][pl];
                         }
                     }
                 }

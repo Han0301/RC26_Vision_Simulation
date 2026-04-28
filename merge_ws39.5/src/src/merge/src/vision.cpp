@@ -844,6 +844,7 @@ void vision_test_super1()
 
     for(size_t i = 0; i < datasets.size(); i++)
     {
+        // int i = 0;
         Ten::superstratum::supper2 supper2_;
         std::cout << "---------------------------------idx: " << i + 1 << std::endl;
         std::vector<int> label(12);
@@ -869,8 +870,18 @@ void vision_test_super1()
         std::vector<int> place = supper2_.get_place();
         std::vector<float> conf = supper2_.get_confidence_();
         std::vector<float> per_loss = supper2_.get_per_loss();
-        std::vector<std::vector<float>> time_ps_w = supper2_.get_time_ps_w_();
+        std::vector<std::vector<float>> time_ps_ = supper2_.get_time_ps_();
 
+        std::cout << "time_ps_: " << std::endl;
+        for (int i = 0; i < time_ps_.size(); i++)
+        {
+            std::cout << "time " << i << " ";
+            for (int j = 0; j < time_ps_[i].size(); j++)
+            {
+                std::cout << time_ps_[i][j] << ", ";
+            }
+            std::cout << std::endl;
+        }
         // 调试打印
         supper2_.print_post_cls();
 

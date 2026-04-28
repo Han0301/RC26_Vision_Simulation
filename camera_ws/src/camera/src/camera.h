@@ -1,0 +1,116 @@
+#ifndef __CAMERA_H_
+#define __CAMERA_H_
+#include <librealsense2/rs.hpp>
+#include <opencv2/opencv.hpp>
+#include <ros/ros.h>
+#include <iostream>
+#include <string>
+#include <mutex>
+#include <unistd.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl/filters/statistical_outlier_removal.h>
+#include <unordered_set>
+
+namespace Ten
+{
+
+struct camera_frame
+{
+    cv::Mat bgr_image;
+    cv::Mat depth_image;
+    std::shared_ptr<rs2::depth_frame> raw_depth_frame;
+};
+
+class Ten_camera
+{
+public:
+    //禁用拷贝构造
+    Ten_camera(const Ten_camera& serial) = delete;
+    //禁用赋值
+    Ten_camera& operator=(const Ten_camera& serial) = delete;
+    /**
+        @brief 设置分辨率和帧率
+        @param w: 1920 640
+        @param h: 1080 480
+        @param fps: 帧率
+        @return Ten_camera& 返回Ten_camera实例
+    */
+    static Ten_camera& GetInstance(size_t w = 1920, size_t h = 1080, size_t fps = 30);
+
+
+    /** 
+        @brief 读取图片 
+        @return cv::Mat 
+    */
+    cv::Mat camera_read();
+
+    /** 
+        @brief 读取bgr和depth图片
+        @return 结构体 camera_frame
+    */
+    camera_frame camera_read_depth();
+
+    /**
+        @brief 设置分辨率和帧率
+        @param w: 1920 640
+        @param h: 1080 480
+        @param fps: 帧率
+    */
+    void reset_camera(size_t w, size_t h, size_t fps);
+
+    /**
+        @brief 设置分辨率和帧率（启用深度和bgr双加载）
+        @param w: 1920 640
+        @param h: 1080 480
+        @param fps: 帧率
+    */
+    void reset_camera_depth(size_t w, size_t h, size_t fps);
+    
+    rs2_intrinsics get_color_intrinsics();
+
+    // /**
+    //     @brief 高效读取图片
+    //     @param int: 无实际意义，用于函数重载
+    //     @return cv::Mat* 外面要delete 对象
+    // */
+
+    // cv::Mat* camera_read(int);
+
+    // 析构函数
+    ~Ten_camera()
+    {
+        pipe.stop();
+    }
+private:
+    Ten_camera(size_t w, size_t h, size_t fps)
+    {
+        config.enable_stream(RS2_STREAM_COLOR, w, h, RS2_FORMAT_BGR8, fps);
+        pipe.start(config);
+        _w = w;
+        _h = h;
+    }
+
+    static std::unique_ptr<Ten_camera> create(size_t w = 1920, size_t h = 1080, size_t fps = 30) {
+        // 静态函数可访问私有构造函数，直接new对象后封装为unique_ptr
+        return std::unique_ptr<Ten_camera>(new Ten_camera(w, h, fps));
+    }
+
+rs2_intrinsics color_intr_;   // 你已有的
+
+
+rs2::pipeline pipe;
+rs2::config config;
+std::mutex read_mtx_;
+size_t _w = 0;
+size_t _h = 0;
+static std::once_flag camera_flag_;
+rs2::align align_to_color_{RS2_STREAM_COLOR};
+
+};
+
+
+}
+
+#endif
