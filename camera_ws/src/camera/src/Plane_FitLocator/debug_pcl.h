@@ -196,12 +196,22 @@ public:
         float c_pixel[2] = {0};
         rs2_project_point_to_pixel(c_pixel, &color_intr, c_point3d);
         cv::Point center_p(cvRound(c_pixel[0]), cvRound(c_pixel[1]));
+        int u = c_pixel[0];
+        int v = c_pixel[1];
         if (center_p.x >=0 && center_p.x < output_image.cols && center_p.y >=0 && center_p.y < output_image.rows)
         {
             cv::circle(output_image, center_p, 8, cv::Scalar(0, 0, 255), -1);
-        }
+            cv::putText(output_image, "Plane Center", cv::Point(u+10, v), 
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
 
-        std::cout << "✅ 四边形调试图像绘制完成" << std::endl;
+            char coord_text[100];
+            sprintf(coord_text, "X:%.3f Y:%.3f Z:%.3f", 
+                    center_3d.x(), center_3d.y(), center_3d.z());
+            
+            // 绘制在中心点下方，避免重叠
+            cv::putText(output_image, coord_text, cv::Point(u+10, v + 20), 
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
+        }
     }
 
 

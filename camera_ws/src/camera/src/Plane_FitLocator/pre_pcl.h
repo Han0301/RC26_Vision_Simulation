@@ -31,7 +31,8 @@
 #define StddevMulThresh 1.0f        // 距离超过「平均值 + 2 倍标准差」的点，全部删掉,数值越小 = 删得越狠, 数值越大 = 删得越少
 
 // 体素下采样 参数
-#define leaf_size 0.008f            // 体素边长
+#define leaf_size_XY 0.005f            // 体素边长
+#define leaf_size_Z  0.010f            // 体素边长
 
 // 平面拟合 参数
 #define DistanceThreshold 0.02f     // 点到 拟合平面的距离上限(m), 默认为 0.02f
@@ -164,7 +165,7 @@ public:
     {
         return plane_rot_mat;
     }
-    
+
     void set_plane_info_corner(const std::vector<Eigen::Vector3d>& plane_corner)
     {
         plane_info.plane_corner = plane_corner;
@@ -187,7 +188,7 @@ private:
         pcl::VoxelGrid<pcl::PointXYZ> vg;
         vg.setInputCloud(input_cloud);
         // 设置体素大小（核心参数）
-        vg.setLeafSize(leaf_size, leaf_size, leaf_size);
+        vg.setLeafSize(leaf_size_XY, leaf_size_XY, leaf_size_Z);
         // 执行滤波
         vg.filter(*output_cloud);
     }

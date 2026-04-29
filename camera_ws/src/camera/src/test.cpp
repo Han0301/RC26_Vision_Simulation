@@ -60,7 +60,15 @@ void test1(ros::NodeHandle& nh)
         pcl::ModelCoefficients::Ptr plane_coeffs = _PRE_PCL_.get_plane_coeffs();
         Ten::Plane_FitLocator::Plane_Info plane_info = _PRE_PCL_.get_plane_info(ret);
         // 方形拟合
-        _POST_PCL_.fitPlaneQuadrilateral(plane_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat());
+        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_2d_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        _POST_PCL_.set_2d_cloud(plane_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat(), plane_2d_cloud);
+        _POST_PCL_.fit_PlaneSquare(plane_2d_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat());
+        // 调试2d点云
+        pcl::PointCloud<pcl::PointXYZ>::Ptr debug_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        std::vector<pcl::PointXYZ> obb_corners = _POST_PCL_.get_obb_corners();
+        *debug_cloud = *plane_2d_cloud;
+        // 添加矩形角点到点云（红色标记）
+        for (auto& pt : obb_corners) debug_cloud->push_back(pt);
         _PRE_PCL_.set_plane_info_corner(_POST_PCL_.get_plane_corner());
 
         plane_info = _PRE_PCL_.get_plane_info(ret);
@@ -70,7 +78,7 @@ void test1(ros::NodeHandle& nh)
         _DEBUG_PCL_.debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
         cv::imshow("bgr_frame", debug_image);
 
-        _DEBUG_PCL_.publish_pointcloud(plane_cloud);          // 发布点云
+        _DEBUG_PCL_.publish_pointcloud(debug_cloud);          // 发布点云
         _DEBUG_PCL_.publish_PlaneTF(plane_info);
 
 
