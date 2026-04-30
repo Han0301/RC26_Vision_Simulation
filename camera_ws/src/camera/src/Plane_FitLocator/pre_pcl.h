@@ -63,9 +63,9 @@ public:
 
     /**
      * @brief 提取点云中【最大平面】, 填充 plane_info 中 plane_coeffs 字段
-     * @param input_cloud 输入点云
-     * @param output_cloud 输出点云（拟合的最大平面的点云） 
-     * @param plane_info   面的相关信息
+     * @param input_cloud   输入点云
+     * @param output_cloud  输出点云（拟合的最大平面的点云） 
+     * @param plane_info    面的相关信息
      * @return 拟合成功返回true
      */
     bool Plane_fitter(

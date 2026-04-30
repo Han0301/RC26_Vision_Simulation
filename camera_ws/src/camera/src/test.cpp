@@ -48,7 +48,7 @@ void test1(ros::NodeHandle& nh)
 
         cv::Mat depth_show;
         cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-        cv::imshow("depth_frame", depth_show);
+        cv::imshow("depth_frame", depth_show); 
 
         // 设置点云
         _SET_PCL_.set_Pcl_Cloud(frame.raw_depth_frame, color_intr, input_cloud);

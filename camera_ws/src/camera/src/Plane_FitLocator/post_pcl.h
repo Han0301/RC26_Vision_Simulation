@@ -1,17 +1,9 @@
 #ifndef __POST_PCL_
 #define __POST_PCL_
-#include <librealsense2/rs.hpp>
-#include <opencv2/opencv.hpp>
-#include <ros/ros.h>
 #include <iostream>
-#include <string>
-#include <mutex>
-#include <unistd.h>
-#include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/statistical_outlier_removal.h>
-#include <unordered_set>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
@@ -26,7 +18,6 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/convex_hull.h>
-#include <random>
 
 // 半径滤波器参数
 #define RadiusSearch 0.03        // 判断为杂点的最小距离， 范围内 没有足够近邻点 则直接删除
@@ -333,7 +324,7 @@ private:
             long_edge = edge2;
             short_edge = corners[0] - corners[1];
         }
-        
+
         Eigen::Vector3d x_axis = long_edge.normalized();
         // 固定方向：如果和世界X轴点积为负，就反转X轴（永远朝一个方向）
         if (x_axis.dot(Eigen::Vector3d(1,0,0)) < 0) {
