@@ -24,6 +24,8 @@ void test1(ros::NodeHandle& nh)
     Ten::Plane_FitLocator::Ten_pre_pcl _PRE_PCL_;
     Ten::Plane_FitLocator::Ten_set_pcl _SET_PCL_;
     Ten::Plane_FitLocator::Ten_post_pcl _POST_PCL_;
+    Ten::Plane_FitLocator::Plane_Info plane_info;
+
     // 点云
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -50,35 +52,24 @@ void test1(ros::NodeHandle& nh)
 
         // 设置点云
         _SET_PCL_.set_Pcl_Cloud(frame.raw_depth_frame, color_intr, input_cloud);
-        // 滤波
+        // 滤波器
         _PRE_PCL_.cloud_filter(input_cloud,output_cloud);      // 设置点云
         // 提取平面和中心点，法向量
-        bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud);
-        _PRE_PCL_.computeCenterAndNormal(plane_cloud);
+        bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud, plane_info);
 
-
-        pcl::ModelCoefficients::Ptr plane_coeffs = _PRE_PCL_.get_plane_coeffs();
-        Ten::Plane_FitLocator::Plane_Info plane_info = _PRE_PCL_.get_plane_info(ret);
         // 方形拟合
         pcl::PointCloud<pcl::PointXYZ>::Ptr plane_2d_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        _POST_PCL_.set_2d_cloud(plane_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat(), plane_2d_cloud);
-        _POST_PCL_.fit_PlaneSquare(plane_2d_cloud,plane_coeffs,plane_info,_PRE_PCL_.get_plane_rot_mat());
-        // 调试2d点云
-        pcl::PointCloud<pcl::PointXYZ>::Ptr debug_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        std::vector<pcl::PointXYZ> obb_corners = _POST_PCL_.get_obb_corners();
-        *debug_cloud = *plane_2d_cloud;
-        // 添加矩形角点到点云（红色标记）
-        for (auto& pt : obb_corners) debug_cloud->push_back(pt);
-        _PRE_PCL_.set_plane_info_corner(_POST_PCL_.get_plane_corner());
+        _POST_PCL_.compute_CenterAndNormal(plane_cloud,plane_info);
+        _POST_PCL_.set_2d_cloud(plane_cloud,plane_info, plane_2d_cloud);
+        _POST_PCL_.fit_PlaneSquare(plane_2d_cloud,plane_info);
+        _POST_PCL_.set_plane_euler(plane_info);
 
-        plane_info = _PRE_PCL_.get_plane_info(ret);
-        // 发布调试图像和点云,tf话题
         cv::Mat debug_image;
         // _DEBUG_PCL_.debug_rgb_image(frame.bgr_image,plane_info, color_intr,debug_image);
         _DEBUG_PCL_.debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
         cv::imshow("bgr_frame", debug_image);
 
-        _DEBUG_PCL_.publish_pointcloud(debug_cloud);          // 发布点云
+        _DEBUG_PCL_.publish_pointcloud(plane_cloud);          // 发布点云
         _DEBUG_PCL_.publish_PlaneTF(plane_info);
 
 
