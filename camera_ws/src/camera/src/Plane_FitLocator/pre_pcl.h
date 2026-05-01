@@ -51,14 +51,21 @@ public:
      * @brief 点云滤波器
      * @param input_pclclouds 输入点云
      * @param out_pclclouds 输出的点云
+     * @return bool
     */
-    void cloud_filter(
+    bool cloud_filter(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_pclclouds,
         pcl::PointCloud<pcl::PointXYZ>::Ptr& out_pclclouds
     )
     {
         voxel_Downsample(input_pclclouds,out_pclclouds);
         statistical_filter(out_pclclouds,out_pclclouds);
+        if(out_pclclouds->size() <= 50)
+        {
+            std::cout << "out_pclclouds->size(): " <<out_pclclouds->size() <<std::endl;
+            return false;
+        }
+        return true;
     }
 
     /**
