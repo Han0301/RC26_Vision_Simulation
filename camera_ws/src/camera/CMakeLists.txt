@@ -16,7 +16,8 @@ project(camera)
 ## is used, also find other catkin packages
 
 ## 启用 C++14（必须！CCTag 要求）
-add_compile_options(-std=c++14)
+set( CMAKE_CXX_FLAGS "-std=c++17 -O3" ) 
+#add_compile_options(-std=c++14)
 
 set(realsense2_FOUND TRUE)
 
@@ -41,6 +42,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   vision_msgs
 )
+find_package(OpenVINO REQUIRED)
 
 
 find_package(realsense2)
@@ -170,7 +172,6 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(test_node 
 src/test.cpp
-src/method_math.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -187,12 +188,15 @@ src/method_math.cpp
 
 target_sources(test_node
   PRIVATE
+  src/yolo/yolo_base.cpp
   src/camera.cpp
+  src/method_math.cpp
 )
 
 
 target_link_libraries(test_node
   ${catkin_LIBRARIES}
+  openvino::runtime
   ${realsense2_INCLUDE_DIR}
   /usr/lib/x86_64-linux-gnu/librealsense2.so
 )

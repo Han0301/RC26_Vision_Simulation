@@ -70,12 +70,9 @@ namespace Ten
                 return true;
             }
 
-            Plane_Info get_plane_info(bool ret) const
+            Plane_Info get_plane_info() const
             {
-                if (ret)
-                {
-                    return plane_info;
-                }
+                return plane_info;
             }
 
         private:

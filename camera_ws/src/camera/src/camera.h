@@ -7,11 +7,6 @@
 #include <string>
 #include <mutex>
 #include <unistd.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/filters/statistical_outlier_removal.h>
-#include <unordered_set>
 
 namespace Ten
 {
@@ -22,6 +17,8 @@ struct camera_frame
     cv::Mat depth_image;
     std::shared_ptr<rs2::depth_frame> raw_depth_frame;
 };
+    
+
 
 class Ten_camera
 {
@@ -38,7 +35,6 @@ public:
         @return Ten_camera& 返回Ten_camera实例
     */
     static Ten_camera& GetInstance(size_t w = 1920, size_t h = 1080, size_t fps = 30);
-
 
     /** 
         @brief 读取图片 
@@ -60,16 +56,6 @@ public:
     */
     void reset_camera(size_t w, size_t h, size_t fps);
 
-    /**
-        @brief 设置分辨率和帧率（启用深度和bgr双加载）
-        @param w: 1920 640
-        @param h: 1080 480
-        @param fps: 帧率
-    */
-    void reset_camera_depth(size_t w, size_t h, size_t fps);
-    
-    rs2_intrinsics get_color_intrinsics();
-
     // /**
     //     @brief 高效读取图片
     //     @param int: 无实际意义，用于函数重载
@@ -77,8 +63,16 @@ public:
     // */
 
     // cv::Mat* camera_read(int);
+    /**
+        @brief 设置分辨率和帧率（启用深度和bgr双加载）
+        @param w: 1920 640
+        @param h: 1080 480
+        @param fps: 帧率
+    */
+    void reset_camera_depth(size_t w, size_t h, size_t fps);
 
-    // 析构函数
+    rs2_intrinsics get_color_intrinsics();
+
     ~Ten_camera()
     {
         pipe.stop();
@@ -97,11 +91,9 @@ private:
         return std::unique_ptr<Ten_camera>(new Ten_camera(w, h, fps));
     }
 
-rs2_intrinsics color_intr_;   // 你已有的
-
-
 rs2::pipeline pipe;
 rs2::config config;
+rs2_intrinsics color_intr_;
 std::mutex read_mtx_;
 size_t _w = 0;
 size_t _h = 0;
@@ -112,5 +104,6 @@ rs2::align align_to_color_{RS2_STREAM_COLOR};
 
 
 }
-
 #endif
+
+

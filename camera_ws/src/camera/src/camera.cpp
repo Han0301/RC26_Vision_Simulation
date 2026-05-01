@@ -59,13 +59,9 @@ namespace Ten
                     (void*)depth_frame.get_data(), cv::Mat::AUTO_STEP);
         // 保存原生深度帧
         frame.raw_depth_frame = std::make_shared<rs2::depth_frame>(depth_frame);
-
-        int center_x = _w / 2;
-        int center_y = _h / 2;
-        // 直接从realsense接口获取米级深度（比opencv转算更准）
-        float z_distance = depth_frame.get_distance(center_x, center_y);
         return frame;
     }
+
 
     void Ten_camera::reset_camera(size_t w, size_t h, size_t fps)
     {
@@ -122,7 +118,7 @@ namespace Ten
         {
             depth_sensor.set_option(RS2_OPTION_AUTO_EXPOSURE_MODE, 0.0f);
             depth_sensor.set_option(RS2_OPTION_EXPOSURE, 7500.0f); 
-            }
+        }
         // ====================================================================
 
         auto color_profile = active_profile.get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();

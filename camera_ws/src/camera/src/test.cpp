@@ -30,7 +30,7 @@ void test1(ros::NodeHandle& nh)
 
         // 处理
         bool ret = pose_resolve_.process(frame,debug_cloud);
-        Ten::Plane_FitLocator::Plane_Info plane_info = pose_resolve_.get_plane_info(ret);
+        Ten::Plane_FitLocator::Plane_Info plane_info = pose_resolve_.get_plane_info();
 
         // 调试输出
         // 深度图
