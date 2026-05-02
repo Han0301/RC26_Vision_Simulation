@@ -188,7 +188,6 @@ src/test.cpp
 
 target_sources(test_node
   PRIVATE
-  src/yolo/yolo_base.cpp
   src/camera.cpp
   src/method_math.cpp
 )
