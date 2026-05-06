@@ -146,16 +146,13 @@ public:
     )
     {
         // ===================== 核心参数：35cm正方形固定尺寸 =====================
-        const double SQUARE_SIZE = 0.35;    // 现实物理尺寸：35cm
-        const double HALF_SIZE = SQUARE_SIZE / 2.0; // 半长 0.175m
+        const double SQUARE_SIZE = 0.35;    
+        const double HALF_SIZE = SQUARE_SIZE / 2.0;
 
-        // 1. 复制原图
         output_image = input_image.clone();
-        // 存储投影后的2D像素点
         std::vector<cv::Point> pixel_points;
 
-        // ===================== 步骤1：仅用中心点+旋转矩阵 生成35cm正方形3D角点 =====================
-        // 局部坐标系下的标准正方形4个角点 (Z=0，中心在局部原点)
+        // ===================== 修复：正确4个正方形角点，不要写错 =====================
         std::vector<Eigen::Vector3d> local_corners = {
             Eigen::Vector3d(-HALF_SIZE, -HALF_SIZE, 0.0),  // 左下
             Eigen::Vector3d( HALF_SIZE, -HALF_SIZE, 0.0),  // 右下
@@ -163,9 +160,35 @@ public:
             Eigen::Vector3d(-HALF_SIZE,  HALF_SIZE, 0.0)   // 左上
         };
 
-        // 局部坐标 → 世界3D坐标 (旋转矩阵 + 中心点偏移)
         const Eigen::Vector3d& center = plane_info.plane_center;
-        const Eigen::Matrix3d& rot_mat = plane_info.plane_rot_mat;
+
+        // 1. 用法向量构建基础坐标系
+        const Eigen::Vector3d& n = plane_info.plane_normal;
+        Eigen::Vector3d norm_n = n;
+        norm_n.normalize();
+        Eigen::Vector3d x_axis, y_axis;
+        if (std::fabs(norm_n.z()) < 0.999) {
+            x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
+        } else {
+            x_axis = Eigen::Vector3d(0, 1, 0).cross(norm_n).normalized();
+        }
+        y_axis = norm_n.cross(x_axis).normalized();
+
+        // 2. 初始旋转矩阵
+        Eigen::Matrix3d rot_mat;
+        rot_mat.col(0) = x_axis;
+        rot_mat.col(1) = y_axis;
+        rot_mat.col(2) = norm_n;
+
+        // 3. 叠加最优Yaw，和TF对齐
+        double yaw = plane_info.plane_euler._yaw;
+        Eigen::Matrix3d rot_yaw;
+        rot_yaw << cos(yaw), -sin(yaw), 0,
+                sin(yaw),  cos(yaw), 0,
+                0,         0,        1;
+        rot_mat = rot_mat * rot_yaw;
+
+        // 四角点转世界坐标
         std::vector<Eigen::Vector3d> world_corners;
         for (const auto& local_pt : local_corners)
         {
@@ -173,13 +196,11 @@ public:
             world_corners.push_back(world_pt);
         }
 
-        // ===================== 步骤2：3D世界坐标 → 2D像素坐标投影 =====================
+        // 投影到像素
         for (const auto& pt_3d : world_corners)
         {
-            // 转换为RealSense投影需要的格式
             float point3d[3] = {(float)pt_3d.x(), (float)pt_3d.y(), (float)pt_3d.z()};
             float pixel[2] = {0};
-            // 3D相机坐标 → 2D像素坐标
             rs2_project_point_to_pixel(pixel, &color_intr, point3d);
             
             int u = cvRound(pixel[0]);
@@ -187,21 +208,17 @@ public:
             pixel_points.emplace_back(u, v);
         }
 
-        // ===================== 步骤3：绘制正方形边框+角点（原有样式完全保留） =====================
+        // 绘制方框
         for (int i = 0; i < pixel_points.size(); i++)
         {
             cv::Point p = pixel_points[i];
-            // 越界判断，防止绘图崩溃
             if (p.x < 0 || p.x >= output_image.cols || p.y < 0 || p.y >= output_image.rows)
                 continue;
 
-            // 绘制角点：蓝色实心圆
             cv::circle(output_image, p, 6, cv::Scalar(255, 0, 0), -1);
-            // 标注角点序号
             cv::putText(output_image, std::to_string(i+1), cv::Point(p.x+5, p.y),
                         cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
 
-            // 绘制闭合边框：连接当前点和下一个点，最后一个点连接第一个点
             int next_idx = (i + 1) % pixel_points.size();
             cv::Point p_next = pixel_points[next_idx];
             if (p_next.x >= 0 && p_next.x < output_image.cols && p_next.y >= 0 && p_next.y < output_image.rows)
@@ -210,7 +227,7 @@ public:
             }
         }
 
-        // ===================== 步骤4：绘制平面中心+坐标（原有逻辑完全保留） =====================
+        // 绘制中心点文字
         Eigen::Vector3d center_3d = plane_info.plane_center;
         float c_point3d[3] = {(float)center_3d.x(), (float)center_3d.y(), (float)center_3d.z()};
         float c_pixel[2] = {0};
@@ -228,11 +245,12 @@ public:
             sprintf(coord_text, "X:%.3f Y:%.3f Z:%.3f", 
                     center_3d.x(), center_3d.y(), center_3d.z());
             
-            // 绘制在中心点下方，避免重叠
             cv::putText(output_image, coord_text, cv::Point(u+10, v + 20), 
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
         }
     }
+
+
 private:
 ros::NodeHandle nh;
 ros::Publisher pcl_pub_;
