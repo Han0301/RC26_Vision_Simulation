@@ -278,10 +278,7 @@ void BaseMoveController::controlLoop() {
                 float yaw_rad = state_.lidar_yaw * M_PI / 180.0;
                 vel_msg.linear.x = pid_output_x * cos(yaw_rad) + pid_output_y * sin(yaw_rad);
                 vel_msg.linear.y = -pid_output_x * sin(yaw_rad) + pid_output_y * cos(yaw_rad);
-                vel_msg.angular.z = pid_output_yaw; // 完全保留视觉yaw
-
-                ROS_INFO("DEBUG: VEL(%.2f, %.2f) | PID(%.2f, %.2f)",
-                        vel_msg.linear.x, vel_msg.linear.y, pid_output_x, pid_output_y);
+                vel_msg.angular.z = pid_output_yaw; 
             }
 
             // 延迟5秒再判断到达

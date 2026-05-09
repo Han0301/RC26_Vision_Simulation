@@ -33,7 +33,6 @@
 #include "package/world_to_camera.h"  
 #include "package/BaseMoveController.h"
 
-
 struct G
 {
     G()
@@ -45,20 +44,25 @@ struct G
             0, 0, 1);
         // 2. 畸变系数（假设零畸变）
         _distCoeffs = cv::Mat::zeros(5, 1, CV_64F);
-        num = Ten::_OCCLUSION_HANDING_.get_txt_flag("/home/h/RC2026/world_ws13/src/zwei/map1_add");
-        Ten::_OCCLUSION_HANDING_.write_txt_flag(num, "/home/h/RC2026/world_ws13/src/zwei/map1_add");
+
+        // 设置工作空间目录 -> 清空txt文档 -> 确定sh文件内容 —> 开始自动录制数据集
+        workspace_path = "/home/h/RC2026/world_ws13";
+        datasets_path = "/home/h/视频/Datasets_new";
+
+        num = Ten::_OCCLUSION_HANDING_.get_txt_flag(workspace_path + "/src/zwei/map1_add");
+        Ten::_OCCLUSION_HANDING_.write_txt_flag(num, workspace_path + "/src/zwei/map1_add");
     }
+    std::string workspace_path;
+    std::string datasets_path;
 
     std::vector<Ten::box> box_lists;
-
-    bool is_move = true;
 
     cv::Mat _K;
     cv::Mat _distCoeffs;
 
     cv::Mat _image;
     cv::Mat debug_image;
-    cv::Mat debug_best_roi_image = cv::Mat::zeros(480, 640, CV_8UC3);;
+    cv::Mat debug_best_roi_image = cv::Mat::zeros(480, 640, CV_8UC3);
     std::mutex _mtx_image;
 
     image_transport::Publisher zbuffer_pub;
@@ -70,14 +74,7 @@ struct G
     bool image_updated = false;             // 图像更新标记
     std::mutex data_mutex;                  // 互斥锁，防止数据竞争
 
-    std::vector<cv::Point2d> save_datasets_pos;
-
-    // 🔥 新增：长时间静止检测变量
-    cv::Point2d last_check_pos;       // 上一次检测时的位置
-    std::chrono::steady_clock::time_point static_start_time; // 开始静止的时间
-    bool first_pos_recorded = false;   // 是否记录了第一个位置
-    const double MAX_STATIC_TIME = 16.0; // 最大静止时间：60秒
-    const double STATIC_DIST_THRESHOLD = 0.1; // 静止距离阈值：0.1米
+    std::vector<cv::Point2d> save_datasets_pos;     // 记录保存图像时点的位置， 以防止在同一个位置 重复拍摄
 }global;
 
 void zbuffer_process()
@@ -129,14 +126,15 @@ void zbuffer_process()
         print_num = false;
         std::cout << "atoi(global.num.c_str()) : " << atoi(global.num.c_str()) << std::endl;
     }
-    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber("/home/h/视频/Datasets_new/global_images");
+
+    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber(global.datasets_path + "/global_images");
     
     static Ten::XYZRPY last_tf;         // 上一帧的tf
     static Ten::XYZRPY total_tf;        // 累积的tf差值
     bool place_update = Ten::_OCCLUSION_HANDING_.is_pos_update(tf, last_tf, total_tf);      // 判断位置是否移动到一定程度
-    bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));
+    bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));     // 判断是否在同一个位置 重复拍摄
 
-    static int start_update = 0;
+    static int start_update = 0;        // 起始处等5帧， 防止保存空图像
     if (place_update && tf_update && start_update > 5)
     { 
         static int save_count = 1;
@@ -151,8 +149,8 @@ void zbuffer_process()
             Ten::_OCCLUSION_HANDING_.save_dataset(
                 Ten::_INIT_3D_BOX_.box_lists_,
                 global._image,
-                Ten::_OCCLUSION_HANDING_.processMapFile("/home/h/RC2026/world_ws13/src/zwei/map1_add/txt",atoi(global.num.c_str())),
-                "/home/h/视频/Datasets_new",
+                Ten::_OCCLUSION_HANDING_.processMapFile(global.workspace_path + "/src/zwei/map1_add/txt",atoi(global.num.c_str())),
+                global.datasets_path,
                 cccc.rvec(),
                 cccc.tvec(),
                 save_count_sta + save_count
@@ -233,7 +231,6 @@ int main(int argc, char **argv)
     ros::Rate rate(10);
     while(ros::ok())
     {
-        std::cout << "move_controller.isCompleted(): " << move_controller.isCompleted() << std::endl;
         if (move_controller.isCompleted()) {
             ros::shutdown();
             break;

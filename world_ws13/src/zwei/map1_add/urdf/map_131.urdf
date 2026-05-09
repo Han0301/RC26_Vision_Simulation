@@ -974,6 +974,112 @@
               xyz="0 0 0" />
           </joint>
           <link
+            name="Link26">
+            <inertial>
+              <origin
+                xyz="0 0.165 -4.44089209850063E-16"
+                rpy="0 0 0" />
+              <mass
+                value="42.875" />
+              <inertia
+                ixx="0.875364583333331"
+                ixy="5.86914776038772E-19"
+                ixz="-2.01311768181315E-16"
+                iyy="0.875364583333331"
+                iyz="-5.86914776038792E-19"
+                izz="0.875364583333332" />
+            </inertial>
+            <visual>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/r221.dae" />
+              </geometry>
+              <material
+                name="">
+                <color
+                  rgba="1 1 1 1" />
+              </material>
+            </visual>
+            <collision>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/Link26.STL" />
+              </geometry>
+            </collision>
+          </link>
+          <joint
+            name="26"
+            type="fixed">
+            <origin
+              xyz="3 3.8 0.2098"
+              rpy="1.5707963267949 0 0" />
+            <parent
+              link="base_link" />
+            <child
+              link="Link26" />
+            <axis
+              xyz="0 0 0" />
+          </joint>
+          <link
+            name="Link27">
+            <inertial>
+              <origin
+                xyz="0 0.175 0"
+                rpy="0 0 0" />
+              <mass
+                value="42.8749999999999" />
+              <inertia
+                ixx="0.875364583333331"
+                ixy="4.60222138176646E-17"
+                ixz="4.61436444609835E-18"
+                iyy="0.875364583333331"
+                iyz="-5.86914776038796E-19"
+                izz="0.875364583333331" />
+            </inertial>
+            <visual>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/r301.dae" />
+              </geometry>
+              <material
+                name="">
+                <color
+                  rgba="1 1 1 1" />
+              </material>
+            </visual>
+            <collision>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/Link27.STL" />
+              </geometry>
+            </collision>
+          </link>
+          <joint
+            name="27"
+            type="fixed">
+            <origin
+              xyz="4.2 3.8 0.399800000000001"
+              rpy="1.5707963267949 0 0" />
+            <parent
+              link="base_link" />
+            <child
+              link="Link27" />
+            <axis
+              xyz="0 0 0" />
+          </joint>
+          <link
             name="Link28">
             <inertial>
               <origin
@@ -995,7 +1101,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r401.dae" />
+                  filename="package://zwei/meshes/r404.dae" />
               </geometry>
               <material
                 name="">
@@ -1027,6 +1133,59 @@
               xyz="0 0 0" />
           </joint>
           <link
+            name="Link29">
+            <inertial>
+              <origin
+                xyz="1.11022302462516E-16 0.165 1.11022302462516E-16"
+                rpy="0 0 0" />
+              <mass
+                value="42.875" />
+              <inertia
+                ixx="0.875364583333333"
+                ixy="1.81208838190243E-18"
+                ixz="8.00444944262377E-17"
+                iyy="0.875364583333333"
+                iyz="2.01902317758063E-16"
+                izz="0.875364583333334" />
+            </inertial>
+            <visual>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/r512.dae" />
+              </geometry>
+              <material
+                name="">
+                <color
+                  rgba="1 1 1 1" />
+              </material>
+            </visual>
+            <collision>
+              <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+              <geometry>
+                <mesh
+                  filename="package://zwei/meshes/Link29.STL" />
+              </geometry>
+            </collision>
+          </link>
+          <joint
+            name="29"
+            type="fixed">
+            <origin
+              xyz="3.165 5 0.5748"
+              rpy="1.5707963267949 -1.5707963267949 0" />
+            <parent
+              link="base_link" />
+            <child
+              link="Link29" />
+            <axis
+              xyz="0 0 0" />
+          </joint>
+          <link
             name="Link30">
             <inertial>
               <origin
@@ -1048,7 +1207,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r612.dae" />
+                  filename="package://zwei/meshes/r609.dae" />
               </geometry>
               <material
                 name="">
@@ -1101,7 +1260,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r723.dae" />
+                  filename="package://zwei/meshes/r701.dae" />
               </geometry>
               <material
                 name="">
@@ -1154,7 +1313,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r807.dae" />
+                  filename="package://zwei/meshes/r801.dae" />
               </geometry>
               <material
                 name="">
@@ -1182,165 +1341,6 @@
               link="base_link" />
             <child
               link="Link32" />
-            <axis
-              xyz="0 0 0" />
-          </joint>
-          <link
-            name="Link34">
-            <inertial>
-              <origin
-                xyz="0 0.175 0"
-                rpy="0 0 0" />
-              <mass
-                value="42.875" />
-              <inertia
-                ixx="0.875364583333332"
-                ixy="-1.46931078415236E-17"
-                ixz="1.38349979620737E-16"
-                iyy="0.875364583333331"
-                iyz="1.9651525777024E-17"
-                izz="0.875364583333331" />
-            </inertial>
-            <visual>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/ra01.dae" />
-              </geometry>
-              <material
-                name="">
-                <color
-                  rgba="1 1 1 1" />
-              </material>
-            </visual>
-            <collision>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/Link34.STL" />
-              </geometry>
-            </collision>
-          </link>
-          <joint
-            name="34"
-            type="fixed">
-            <origin
-              xyz="1.8 7.4 0.199800000000001"
-              rpy="1.5707963267949 0 0" />
-            <parent
-              link="base_link" />
-            <child
-              link="Link34" />
-            <axis
-              xyz="0 0 0" />
-          </joint>
-          <link
-            name="Link35">
-            <inertial>
-              <origin
-                xyz="-1.11022302462516E-16 0.175 0"
-                rpy="0 0 0" />
-              <mass
-                value="42.875" />
-              <inertia
-                ixx="0.875364583333333"
-                ixy="1.18052701877353E-16"
-                ixz="-3.83989045164059E-17"
-                iyy="0.875364583333333"
-                iyz="-7.15730675387921E-17"
-                izz="0.875364583333334" />
-            </inertial>
-            <visual>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/rb06.dae" />
-              </geometry>
-              <material
-                name="">
-                <color
-                  rgba="1 1 1 1" />
-              </material>
-            </visual>
-            <collision>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/Link35.STL" />
-              </geometry>
-            </collision>
-          </link>
-          <joint
-            name="35"
-            type="fixed">
-            <origin
-              xyz="2.825 7.4 0.5748"
-              rpy="1.5707963267949 1.5707963267949 0" />
-            <parent
-              link="base_link" />
-            <child
-              link="Link35" />
-            <axis
-              xyz="0 0 0" />
-          </joint>
-          <link
-            name="Link36">
-            <inertial>
-              <origin
-                xyz="0 0.175 0"
-                rpy="0 0 0" />
-              <mass
-                value="42.875" />
-              <inertia
-                ixx="0.875364583333333"
-                ixy="-8.03668474362122E-17"
-                ixz="-6.2354635343986E-17"
-                iyy="0.875364583333334"
-                iyz="1.96515257770239E-17"
-                izz="0.875364583333334" />
-            </inertial>
-            <visual>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/rc01.dae" />
-              </geometry>
-              <material
-                name="">
-                <color
-                  rgba="1 1 1 1" />
-              </material>
-            </visual>
-            <collision>
-              <origin
-                xyz="0 0 0"
-                rpy="0 0 0" />
-              <geometry>
-                <mesh
-                  filename="package://zwei/meshes/Link36.STL" />
-              </geometry>
-            </collision>
-          </link>
-          <joint
-            name="36"
-            type="fixed">
-            <origin
-              xyz="4.2 7.4 0.549800000000001"
-              rpy="-1.5707963267949 0 3.14159265358979" />
-            <parent
-              link="base_link" />
-            <child
-                link="Link36" />
             <axis
               xyz="0 0 0" />
           </joint>
