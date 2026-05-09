@@ -51,7 +51,7 @@ judge_running()
 #     return 0
 # }
 
-for i in $(seq 1 400);do 
+for i in $(seq 179 400);do 
     name=$launch_name$i$launch
     echo "运行 $name"
     roslaunch zwei $name 1> /dev/null &

@@ -1,0 +1,8 @@
+prefix=/home/h/RC2026/world_ws13/devel
+
+Name: zwei
+Description: Description of zwei
+Version: 1.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
