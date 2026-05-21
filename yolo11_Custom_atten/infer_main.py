@@ -198,25 +198,27 @@ class YOLO11ROIInferencer:
 
 if __name__ == "__main__":
     inferencer = YOLO11ROIInferencer(
-        model_path="H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\evlate_pt\yolo11s_roi12_atten_2.pt",
+        model_path=r"H:\pycharm\yolov11\yolov11_proj4\yolo11Custom_atten\yolo11_pt\roi12_atten_blue17.pt",
         dataset_root=None,
         model_size="s",
         roi_size=64,
         num_roi=12,
         num_classes=2
     )
-    inferencer.infer_roi_folder(r"H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179\roi_images\roi_1",
-                                label_path="H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179\labels\label_1.json",
-                                is_print=True
-                                ,is_save=True,
-                                save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\pre_error.csv")
+    # for i in range(1,20,1):
+    #
+    #     inferencer.infer_roi_folder(rf"F:\test_datas_blue\r\{i}",
+    #                                 label_path=rf"F:\test_datas_blue\{i + 10}\label_1.json",
+    #                                 is_print=True
+    #                                 ,is_save=False,
+    #                                 save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\pre_error.csv")
 
-    inferencer.infer_datasets(datasets_path=r"H:\pycharm\yolov11\yolov11_proj3\datasets_real_p179",
+    inferencer.infer_datasets(datasets_path=r"I:\datasets_real_blue_new785",
                                 is_conf=True,
                               conf_list=[0.9,0.85,0.80,0.75,0.7,0.65,0.6],
                               is_place=True,
                               is_point_size_weight=True,
                               ps_w_thods=[0.4,0.3,0.2,0.1],
                               is_save=True,
-                              save_path=r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\error\ " + f"{inferencer.model_name}" + f"_datasets_real_p179"
+                              save_path=r"I:\datasets_real_blue_new785\error.csv"
                               )

@@ -23,9 +23,9 @@ NUM_CLASSES = 2
 ROI_SIZE = 64
 
 # 文件路径（原始字符串避免转义）
-PT_MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\evlate_pt\yolo11s_roi12_atten_2.pt"
-ONNX_MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\evlate_pt\yolo11s_roi12_atten_2.onnx"
-OPENVINO_IR_PATH = r"H:\pycharm\yolov11\yolov11_proj3\yolo11Custom_atten\evlate_pt\yolo11s_roi12_atten_2"
+PT_MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj4\yolo11Custom_atten\yolo11_pt\roi12_atten_blue17_.pt"
+ONNX_MODEL_PATH = r"H:\pycharm\yolov11\yolov11_proj4\yolo11Custom_atten\yolo11_pt\roi12_atten_blue17_.onnx"
+OPENVINO_IR_PATH = r"H:\pycharm\yolov11\yolov11_proj4\yolo11Custom_atten\yolo11_pt\roi12_atten_blue17_"
 
 # 输入配置
 BATCH_SIZE = 1
