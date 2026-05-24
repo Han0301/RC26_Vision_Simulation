@@ -34,8 +34,8 @@ namespace Ten
             super()
                 :camera_(&Ten::Ten_camera::GetInstance())
                 ,log_(&Ten::Ten_logger::GetInstance(std::string(ROOT_DIR) + std::string("log")))
-                ,orb_determine_position_("/home/maple/study3/li/corner/best", "cpu", 0.3, 0.3, 0)
-                ,yolo_detector_("/home/maple/study2/model/best_openvino_model/best", "cpu", mapping_)
+                ,orb_determine_position_("/home/h/下载/角点检测5/weights/best_openvino_model/best", "cpu", 0.3, 0.3, 0)
+                ,yolo_detector_("/home/h/下载/卷轴分类1_仿真+现实_32类/best", "cpu", mapping_)
                 ,relocation_base_of_map_(std::string(ROOT_DIR) + std::string("map/map.pcd"))
             {
                 //设置稳态误差
@@ -367,14 +367,6 @@ namespace Ten
             {
                 //获得这个世界的坐标系在地图坐标系的x,y,z,roll,pitch,yaw
                 Ten::XYZRPY xyzrpy = relocation_base_of_map_.get_transformation();
-            
-                std::cout << "---------------------------" << std::endl; 
-                std::cout << "x: " << xyzrpy._xyz._x << std::endl;
-                std::cout << "y: " << xyzrpy._xyz._y << std::endl;
-                std::cout << "z: " << xyzrpy._xyz._z << std::endl;
-                std::cout << "roll: " << xyzrpy._rpy._roll << std::endl;
-                std::cout << "pitch: " << xyzrpy._rpy._pitch << std::endl;
-                std::cout << "yaw: " << xyzrpy._rpy._yaw << std::endl;
             
                 Ten::XYZRPY xyzrpy_error;
                 xyzrpy_error._xyz._x = 0.025;
