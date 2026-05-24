@@ -5,8 +5,12 @@
 #include"./../yolo/yolo_han2.h"
 #include <iomanip>      // 打印限制浮点数
 
+<<<<<<< HEAD
 // #define _roi12_path_ "/home/h/下载/roi12_atten_blue17/roi12_atten_blue17"
 #define _roi12_path_ "/home/h/下载/roi12_atten_blue17_/roi12_atten_red17_"
+=======
+#define _roi12_path_ "/home/h/下载/yolo11s_roi12_atten_17/yolo11s_roi12_atten_17"
+>>>>>>> 22244c71884871ca1a38fb3f5bc7f6a195b8514c
 #define _juanzhou_path_ "/home/h/下载/卷轴分类1_仿真+现实_32类/best"
 #define _box_num_ 8
 

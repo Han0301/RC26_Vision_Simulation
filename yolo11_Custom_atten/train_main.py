@@ -36,7 +36,8 @@ def train(model_config, train_config, dataset_config, loss_config):
         model_size=model_config["MODEL_SIZE"],
         num_roi=model_config["NUM_ROI"],
         num_classes=model_config["NUM_CLASSES"],
-        roi_size=model_config["ROI_IMG_SIZE"]
+        roi_size=model_config["ROI_IMG_SIZE"],
+        atten_weight=model_config["ATTEN_WEIGHT"]
     ).to(model_config["DEVICE"])
 
     # 2.2 加载损失

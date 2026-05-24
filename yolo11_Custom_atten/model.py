@@ -2,6 +2,7 @@
 model.py
     定义模型的backbooe,neck,attention,head模块, 并组装模型
 """
+import torch
 import torch.nn as nn
 from ultralytics.nn.modules import Conv, C2f, SPPF
 
@@ -36,20 +37,29 @@ YOLO11_CONFIGS = {
 
 class LocalGrid_Attention(nn.Module):
     """局部网格注意力：建模相邻+指定ROI对的关联"""
-    def __init__(self, dim=256, num_heads=4):
+    def __init__(self, atten_weight, dim=256, num_heads=4):
         super().__init__()
         # 多头自注意力层，batch_first=True 适配 [B, N, C] 格式
         self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
         # 层归一化：稳定训练，适配注意力输出
         self.norm = nn.LayerNorm(dim)
+        self.atten_weight = atten_weight
 
     def forward(self, roi_feat):
         # 自注意力（Q=K=V=roi_feat）
         # 让12个ROI两两计算相关性
+        B, N, C = roi_feat.shape
+        if N == 1:      # 只有一张图片模拟自注意力
+            roi_feat = torch.cat([roi_feat, roi_feat], dim=1)  # [B,3,C] 复制自身模拟注意力输入
+            attn_feat, attn_weights = self.attn(roi_feat, roi_feat, roi_feat)
+            out = self.norm(roi_feat + self.atten_weight * attn_feat)
+            return out[:, :1, :], attn_weights  # 切回1个ROI输出
+            # return roi_feat, None
+
         attn_feat, attn_weights = self.attn(roi_feat, roi_feat, roi_feat)
 
         # 残差连接 + 归一化：保留原始ROI特征，叠加注意力交互特征
-        return self.norm(roi_feat + attn_feat),attn_weights
+        return self.norm(roi_feat + self.atten_weight * attn_feat),attn_weights
 
 class Model_Backbone(nn.Module):
     """提取单个ROI的多尺度语义特征"""
@@ -158,19 +168,20 @@ class Model_Head(nn.Module):
         x = x.squeeze(-1).squeeze(-1)
         x = self.head[1](x)
         x = self.head[2](x)
-        return x.reshape(B, self.num_roi, self.num_classes)  # [B,12,2]
+        return x.reshape(B, N, self.num_classes)  # [B,12,2]
 
 
 class YOLO11ROIClassifier(nn.Module):
     """最终模型：整合Backbone+Neck+Head，支持n/s/l三种尺寸，无预训练权重依赖"""
 
-    def __init__(self, model_size="n", num_roi=12, num_classes=3, roi_size=64):
+    def __init__(self, model_size="n", num_roi=12, num_classes=2, roi_size=64, atten_weight=0.15):
         super().__init__()
         self.attn_weights = None
         self.model_size = model_size  # 模型尺寸（n/s/l）
         self.num_roi = num_roi  # ROI数量（固定12）
         self.num_classes = num_classes  # 分类数（固定3）
         self.roi_size = roi_size  # ROI图像尺寸（固定64x64）
+        self.atten_weight = atten_weight        # 注意力特征所占的权重
         neck_cfg = YOLO11_CONFIGS[model_size]["neck"]
         attn_dim = neck_cfg["channels"][1]  # 动态适配n/s/l维度
 
@@ -178,6 +189,7 @@ class YOLO11ROIClassifier(nn.Module):
         self.backbone = Model_Backbone(model_size=model_size)  # 特征提取
         self.neck = Model_Neck(model_size=model_size)  # 特征融合+降维
         self.spatial_attention = LocalGrid_Attention(
+            atten_weight=self.atten_weight,
             dim=attn_dim,
             num_heads=4 if model_size!="n" else 2  # 参数调整：n模型heads=2，避免维度不匹配
         )
@@ -190,6 +202,7 @@ class YOLO11ROIClassifier(nn.Module):
         :return: pred_logits → [B, 12, 2]（每个ROI的2类预测logits）
         """
         B = roi_imgs.shape[0]  # 获取批次大小B（如B=8）
+        N = roi_imgs.shape[1]
         # 关键：将12个ROI展平为批次维度 → [B,12,3,64,64] → [B×12,3,64,64]
         # 作用：让12个ROI共享Backbone，批量提取特征，提升计算效率
         roi_flat = roi_imgs.reshape(-1, 3, self.roi_size, self.roi_size)
@@ -197,7 +210,7 @@ class YOLO11ROIClassifier(nn.Module):
         # ===================== 特征提取→融合→分类 =====================
         feat_backbone = self.backbone(roi_flat)  # [B×12,3,64,64] → [B×12,128,4,4]（n模型）
         feat_neck = self.neck(feat_backbone)     # → [B×12,32]（n模型）
-        feat_attn = feat_neck.reshape(B, self.num_roi, -1)
+        feat_attn = feat_neck.reshape(B, N, -1)
         feat_attn,self.attn_weights = self.spatial_attention(feat_attn)
         pred_logits = self.head(feat_attn)       # → [B,12,2]
 

@@ -265,7 +265,7 @@ def save_results(
                     for i in range(12):
                         c, a = counts[i], accs[i]
                         rate_c = c / total_folders
-                        rate_a = a / c
+                        rate_a = a / c if c != 0 else 0  # 修复除0bug
                         writer.writerow([i+1, c, f"{rate_c:.3f}", a, f"{rate_a:.3f}"])
                     total_count = sum(counts)  # 总统计数量
                     total_acc = sum(accs)  # 总正确数量
@@ -277,6 +277,51 @@ def save_results(
                     ])
                     writer.writerow([])
                 writer.writerow(["-" * 80])
+                writer.writerow([])
+
+            # ====================== 新增：全局错误推理结果明细 ======================
+            writer.writerow(["=" * 80])
+            writer.writerow(["❌ 全局所有错误推理明细汇总"])
+            writer.writerow(["=" * 80])
+            # 写入统一表头（和原有格式一致）
+            writer.writerow([
+                "错误文件夹路径", "位置", "类别0置信度", "类别1置信度",
+                "预测类别(错误)", "真实类别(正确)", "point_size"
+            ])
+            writer.writerow(["-" * 80])
+
+            # 遍历所有文件夹，筛选并写入错误数据
+            total_error_num = 0  # 统计总错误数
+            for folder_num, res in results.items():
+                # 拼接完整的ROI文件夹路径（和推理时路径一致）
+                roi_folder_path = os.path.join(dataset_path, "roi_images", f"roi_{folder_num}")
+                pred_cls = res["pred_cls_np"]    # 预测类别 [12,]
+                pred_probs = res["pred_probs_np"]# 置信度 [12,2]
+                labels = res["labels"]           # 真实类别 [12,]
+                point_size = res["point_size"]   # 点尺寸 [12,]
+
+                # 遍历12个位置，筛选错误数据
+                for i in range(12):
+                    if pred_cls[i] != labels[i]:
+                        total_error_num += 1
+                        conf0 = round(pred_probs[i][0], 3)
+                        conf1 = round(pred_probs[i][1], 3)
+                        # 写入错误明细
+                        writer.writerow([
+                            roi_folder_path,    # 错误文件夹完整路径
+                            i + 1,              # 错误位置(1-12)
+                            conf0,              # 类别0置信度
+                            conf1,              # 类别1置信度
+                            pred_cls[i],        # 错误预测类别
+                            labels[i],          # 正确真实类别
+                            point_size[i]       # 对应point_size
+                        ])
+
+            # 写入总错误数统计
+            writer.writerow(["-" * 80])
+            writer.writerow([f"✅ 全局总错误数量: {total_error_num}", "", "", "", "", "", ""])
+            writer.writerow(["=" * 80])
+            # ======================================================================
 
         print(f"\n✅ 强制覆写成功！CSV已保存至：{save_path}")
 
