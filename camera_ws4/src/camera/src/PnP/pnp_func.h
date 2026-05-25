@@ -148,12 +148,21 @@ public:
     // 判断平面提取是否成功
     if (out.planeCoeffs.empty())
     {
-      out.status = "plane fit failed";
+      out.status = "plane extract failed";
       return out;
     }
 
     // 平面解算目标位姿
-    solvePoseFromPlanes(out.planeCoeffs, out.planeClouds, &out.center, &out.orientation);
+    bool plane_ok = plane_filter(out.planeCoeffs, out.planeClouds, plane_info);
+    if (plane_ok)
+    {
+      solvePoseFromPlanes(out.planeCoeffs, out.planeClouds, plane_info, &out.center, &out.orientation);
+    }
+    else
+    {
+      out.status = "plane filter failed";
+      return out;
+    }
 
     // 位姿初始化完成后执行ICP精配准
     if (poseInitialized_)
@@ -200,11 +209,15 @@ private:
     cv::cvtColor(src, lab, cv::COLOR_BGR2Lab);
 
     // 颜色阈值提取红色区域
-    cv::inRange(lab,
-                cv::Scalar(cfg_.labLMin, cfg_.labAMin, cfg_.labBMin),
-                cv::Scalar(cfg_.labLMax, cfg_.labAMax, cfg_.labBMax),
-                outMask);
+    // cv::inRange(lab,
+    //             cv::Scalar(cfg_.red.labLMin, cfg_.red.labAMin, cfg_.red.labBMin),
+    //             cv::Scalar(cfg_.red.labLMax, cfg_.red.labAMax, cfg_.red.labBMax),
+    //             outMask);
 
+    cv::inRange(lab,
+                cv::Scalar(cfg_.blue.labLMin, cfg_.blue.labAMin, cfg_.blue.labBMin),
+                cv::Scalar(cfg_.blue.labLMax, cfg_.blue.labAMax, cfg_.blue.labBMax),
+                outMask);
     // 创建形态学卷积核
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
 
@@ -213,6 +226,17 @@ private:
 
     // 闭运算填充空洞
     cv::morphologyEx(outMask, outMask, cv::MORPH_CLOSE, kernel);
+
+    // 计算图像中心点坐标
+    int cx = src.cols / 2;
+    int cy = src.rows / 2;
+
+    // 获取中心点的 Lab 像素值 (OpenCV 中 Lab 存储为 0~255)
+    cv::Vec3b center_lab = lab.at<cv::Vec3b>(cy, cx);
+    int L = center_lab[0];  // L通道
+    int a = center_lab[1];  // a通道
+    int b = center_lab[2];  // b通道
+    std::cout << "L: " << L << ",a: " << a << ",b: " << b << std::endl;
 
     // 提取图像轮廓
     std::vector<std::vector<cv::Point>> contours;
@@ -491,15 +515,19 @@ private:
     return (cv::norm(e1) > cv::norm(e2)) ? dir1 : dir2;
   }
 
-  // 平面融合解算目标位姿
-  void solvePoseFromPlanes(
-      const std::vector<pcl::ModelCoefficients::Ptr>& coeffs,
-      const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds,
-      Eigen::Vector3f* center,
-      Eigen::Quaternionf* orientation)
+  // 多平面筛选， 修改并填充coeffs, clouds, planes
+  bool plane_filter(
+      std::vector<pcl::ModelCoefficients::Ptr>& coeffs,
+      std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds,
+      std::vector<planeData>& planes
+  )
   {
+    planes.clear();
+    std::vector<pcl::ModelCoefficients::Ptr> new_coeffs;
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> new_clouds;
+
     // 遍历平面，计算平面参数
-    std::vector<planeData> planes;
+    std::vector<int> valid_indices;         // 记录【合格平面的原始索引】
     for (size_t i = 0; i < coeffs.size(); ++i)
     {
       if (!clouds[i] || clouds[i]->empty())
@@ -550,19 +578,45 @@ private:
       const Eigen::Vector3f faceCenter = origin + rect.center.x * u + rect.center.y * v;
       const Eigen::Vector3f bodyCenter = faceCenter - n * static_cast<float>(cfg_.objectSize * 0.5);
       const float faceArea = rect.size.width * rect.size.height;
-
-      // 保存平面数据
-      planes.push_back({n, bodyCenter, static_cast<int>(clouds[i]->size()), i, faceArea});
+      // std::cout << "faceArea: " << faceArea << std::endl;
+      // std::cout << "width: " << rect.size.width << ",height: " << rect.size.height << std::endl;
+ 
+       // 保存平面数据
+      if (std::abs(faceArea - cfg_.objectSize * cfg_.objectSize) < cfg_.Areas_min_bias
+          && std::abs(rect.size.width - cfg_.objectSize) < cfg_.size_min_bias
+          && std::abs(rect.size.height - cfg_.objectSize) < cfg_.size_min_bias)
+      {
+        planes.push_back({n, bodyCenter, static_cast<int>(clouds[i]->size()), planes.size(), faceArea});
+        valid_indices.push_back(i);  // 把合格的索引存下来
+        // std::cout << "planes: push_back" << std::endl;
+      }
     }
+
+    for (int idx : valid_indices)
+    {
+      new_coeffs.push_back(coeffs[idx]);
+      new_clouds.push_back(clouds[idx]);
+    }
+    // 用合格平面替换原始容器 → 不合格的彻底删除
+    coeffs.swap(new_coeffs);
+    clouds.swap(new_clouds);
 
     // 判断平面数据是否为空
     if (planes.empty())
     {
-      *center = Eigen::Vector3f::Zero();
-      *orientation = Eigen::Quaternionf::Identity();
-      return;
+      return false;
     }
+    else{return true;}
+  }
 
+  // 平面融合解算目标位姿
+  void solvePoseFromPlanes(
+      const std::vector<pcl::ModelCoefficients::Ptr>& coeffs,
+      const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds,
+      std::vector<planeData> planes,
+      Eigen::Vector3f* center,
+      Eigen::Quaternionf* orientation)
+  {
     // 首帧质量门控与平面匹配
     if (!poseInitialized_)
     {
@@ -857,6 +911,8 @@ private:
   pcl::ModelCoefficients::Ptr coeff;                        // 平面系数
   pcl::PointCloud<pcl::PointXYZ>::Ptr plane;                // 临时平面点云
   pcl::PointCloud<pcl::PointXYZ>::Ptr remain;               // 剩余点云
+
+  std::vector<planeData> plane_info;
 
   bool poseInitialized_ = false;                              // 首帧初始化标志
   Eigen::Vector3f refZAxis_ = Eigen::Vector3f::Zero();       // 参考Z轴

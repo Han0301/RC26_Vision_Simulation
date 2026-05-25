@@ -27,14 +27,29 @@ struct kfsPnpConfig
   double objectSize = 0.35;                 // 目标物理尺寸，单位米，调整位姿尺度
 
   double roiMinArea = 100.0;                // 最小ROI面积，过滤小噪声区域
-  double roiMaxAreaRatio = 0.55;            // 最大ROI占比，过滤过大无效区域
+  double roiMaxAreaRatio = 0.4;            // 最大ROI占比，过滤过大无效区域
 
-  int labLMin = 0;                          // LAB颜色L通道最小值，调整红色检测
-  int labLMax = 255;                        // LAB颜色L通道最大值，调整红色检测
-  int labAMin = 140;                        // LAB颜色A通道最小值，调整红色检测
-  int labAMax = 255;                        // LAB颜色A通道最大值，调整红色检测
-  int labBMin = 0;                          // LAB颜色B通道最小值，调整红色检测
-  int labBMax = 255;                        // LAB颜色B通道最大值，调整红色检测
+  struct red
+  {
+    int labLMin = 0;                          // LAB颜色L通道最小值
+    int labLMax = 255;                        // LAB颜色L通道最大值
+    int labAMin = 135;                        // LAB颜色A通道最小值
+    int labAMax = 255;                        // LAB颜色A通道最大值
+    int labBMin = 130;                          // LAB颜色B通道最小值
+    int labBMax = 180;                        // LAB颜色B通道最大值
+  };
+
+  struct blue
+  {
+    int labLMin = 0;                          // LAB颜色L通道最小值
+    int labLMax = 255;                        // LAB颜色L通道最大值
+    int labAMin = 120;                        // LAB颜色A通道最小值
+    int labAMax = 180;                        // LAB颜色A通道最大值
+    int labBMin = 50;                          // LAB颜色B通道最小值
+    int labBMax = 125;                        // LAB颜色B通道最大值
+  };
+  kfsPnpConfig::red red;
+  kfsPnpConfig::blue blue;
 
   int roi_padding = 0;
   int CloudDepth_min = 100;
@@ -42,6 +57,9 @@ struct kfsPnpConfig
   float voxelLeaf = 0.008f;                  // 体素滤波大小，值越大点云越稀疏
   
   float ClusterTolerance = 0.016;
+
+  float Areas_min_bias = 0.0225;
+  float size_min_bias = 0.03;
 
   double ransacDist = 0.012;                 // RANSAC平面距离阈值，调整平面拟合精度
   int ransacIter = 500;                     // RANSAC迭代次数，值越高拟合越准
