@@ -14,7 +14,7 @@ void test_pnp(ros::NodeHandle& nh)
     
     rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();
 
-    Ten::KFS::kfsPnpRosNode pnp_hander(color_intr);
+    Ten::KFS::kfsLocator pnp_hander(color_intr);
     Ten::KFS::DebugDrawer pnp_debug;
 
     pnp_debug.init();  

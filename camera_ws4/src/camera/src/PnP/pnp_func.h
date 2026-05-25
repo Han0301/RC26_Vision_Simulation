@@ -19,6 +19,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/registration/icp.h>
 #include "pnp_param.h"
@@ -54,6 +55,15 @@ struct kfsPnpOutput
   }
 };
 
+// 平面数据结构体
+struct planeData
+{
+  Eigen::Vector3f normal;
+  Eigen::Vector3f bodyCenter;
+  int pointsCount;
+  size_t cloudIdx;
+  float faceArea;
+};
 
 // PnP位姿求解器类，实现完整位姿解算流程
 class kfsPnpSolver
@@ -61,7 +71,11 @@ class kfsPnpSolver
 public:
   // 构造函数
   explicit kfsPnpSolver(const kfsPnpConfig& cfg, const rs2_intrinsics& color_intr)
-      : cfg_(cfg)
+      : cfg_(cfg),
+        inliers(new pcl::PointIndices),
+        coeff(new pcl::ModelCoefficients),
+        plane(new pcl::PointCloud<pcl::PointXYZ>),
+        remain(new pcl::PointCloud<pcl::PointXYZ>)
   {
     // 覆盖相机内参参数
     cfg_.fx = color_intr.fx;
@@ -81,7 +95,7 @@ public:
    * @param depthU16 输入深度图像
    * @return 解算结果结构体
    */
-  kfsPnpOutput pointcloud_process(
+  kfsPnpOutput process(
     const cv::Mat& colorBgr, 
     const rs2_intrinsics& color_intr,
     std::shared_ptr<rs2::depth_frame> depth_frame = nullptr
@@ -117,8 +131,9 @@ public:
       return out;
     }
 
-    // 点云预处理（滤波+降采样）
+    // 点云预处理（降采样 + 欧式聚类）
     voxel_Downsample(out.cloudRaw, out.cloudFiltered);
+    euclidean_filter(out.cloudFiltered,out.cloudFiltered);
 
     // 判断滤波后点云是否为空
     if (!out.cloudFiltered || out.cloudFiltered->empty())
@@ -311,11 +326,34 @@ private:
       vg.filter(*output_cloud);
   }
 
-  // 多平面特征提取
+  void euclidean_filter(
+      const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
+      pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud)
+  {
+      // 执行欧式聚类
+      std::vector<pcl::PointIndices> cluster_indices;
+      pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+      ec.setInputCloud(input_cloud);
+      ec.setClusterTolerance(cfg_.ClusterTolerance);
+      ec.extract(cluster_indices);
+
+      // 提取主聚类点云
+      if (cluster_indices.empty())
+      {
+          *output_cloud = *input_cloud;
+          return;
+      }
+      output_cloud->clear();
+      for (int idx : cluster_indices[0].indices)
+      {
+          output_cloud->push_back(input_cloud->points[idx]);
+      }
+  }
+
   void extractMultiPlanes(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloudIn,
       std::vector<pcl::ModelCoefficients::Ptr>* planeCoeffs,
-      std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>* planeClouds) const
+      std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>* planeClouds)
   {
     // 清空输出容器
     planeCoeffs->clear();
@@ -341,9 +379,8 @@ private:
         break;
       }
 
-      // 初始化平面系数和内点索引
-      pcl::ModelCoefficients::Ptr coeff(new pcl::ModelCoefficients);
-      pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+      inliers->indices.clear();
+      coeff->values.clear();
 
       // 执行平面分割
       seg.setInputCloud(cloudWork);
@@ -364,13 +401,12 @@ private:
       }
 
       // 提取平面内点
-      pcl::ExtractIndices<pcl::PointXYZ> extract;
       extract.setInputCloud(cloudWork);
       extract.setIndices(inliers);
 
       // 保存当前平面点云
-      pcl::PointCloud<pcl::PointXYZ>::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
       extract.setNegative(false);
+      plane->clear();
       extract.filter(*plane);
 
       // 法向量归一化，过滤重复平面
@@ -391,13 +427,18 @@ private:
       // 保存有效平面
       if (!duplicate)
       {
-        planeCoeffs->push_back(coeff);
-        planeClouds->push_back(plane);
+        // 深拷贝系数
+        pcl::ModelCoefficients::Ptr coeff_copy(new pcl::ModelCoefficients(*coeff));
+        planeCoeffs->push_back(coeff_copy);
+
+        // 深拷贝平面点云
+        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_copy(new pcl::PointCloud<pcl::PointXYZ>(*plane));
+        planeClouds->push_back(plane_copy);
       }
 
       // 移除已提取平面，保留剩余点云
       extract.setNegative(true);
-      pcl::PointCloud<pcl::PointXYZ>::Ptr remain(new pcl::PointCloud<pcl::PointXYZ>);
+      remain->clear();
       extract.filter(*remain);
       cloudWork.swap(remain);
     }
@@ -457,16 +498,6 @@ private:
       Eigen::Vector3f* center,
       Eigen::Quaternionf* orientation)
   {
-    // 平面数据结构体
-    struct planeData
-    {
-      Eigen::Vector3f normal;
-      Eigen::Vector3f bodyCenter;
-      int pointsCount;
-      size_t cloudIdx;
-      float faceArea;
-    };
-
     // 遍历平面，计算平面参数
     std::vector<planeData> planes;
     for (size_t i = 0; i < coeffs.size(); ++i)
@@ -820,6 +851,12 @@ private:
   kfsPnpConfig cfg_;                                          // 算法配置参数
   std::vector<Eigen::Vector3f> centerWindow_;                // 位姿平滑窗口
   std::vector<Eigen::Quaternionf> orientationWindow_;         // 旋转平滑窗口
+
+  pcl::ExtractIndices<pcl::PointXYZ> extract;               // 索引提取器
+  pcl::PointIndices::Ptr inliers;                           // 平面内点索引
+  pcl::ModelCoefficients::Ptr coeff;                        // 平面系数
+  pcl::PointCloud<pcl::PointXYZ>::Ptr plane;                // 临时平面点云
+  pcl::PointCloud<pcl::PointXYZ>::Ptr remain;               // 剩余点云
 
   bool poseInitialized_ = false;                              // 首帧初始化标志
   Eigen::Vector3f refZAxis_ = Eigen::Vector3f::Zero();       // 参考Z轴

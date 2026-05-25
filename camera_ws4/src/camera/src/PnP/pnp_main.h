@@ -28,10 +28,10 @@ static const Eigen::Matrix3f kCamToWorld = []()
 }();
 static const Eigen::Quaternionf kCamToWorldQ(kCamToWorld);
 
-class kfsPnpRosNode
+class kfsLocator
 {
 public:
-    explicit kfsPnpRosNode(const rs2_intrinsics& color_intr)
+    explicit kfsLocator(const rs2_intrinsics& color_intr)
         : solver_(kfsPnpConfig(), color_intr),
           color_intr_(color_intr)
     {
@@ -44,7 +44,7 @@ public:
 
     inline kfsPnpOutput processOneFrame(const cv::Mat color,std::shared_ptr<rs2::depth_frame> depth_frame = nullptr)
     {
-        kfsPnpOutput out = solver_.pointcloud_process(color,color_intr_,depth_frame);
+        kfsPnpOutput out = solver_.process(color,color_intr_,depth_frame);
 
         set_lastest_center(out);
         if (!out.valid)

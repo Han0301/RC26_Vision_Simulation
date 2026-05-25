@@ -41,6 +41,8 @@ struct kfsPnpConfig
   int CloudDepth_max = 2000;
   float voxelLeaf = 0.008f;                  // 体素滤波大小，值越大点云越稀疏
   
+  float ClusterTolerance = 0.016;
+
   double ransacDist = 0.012;                 // RANSAC平面距离阈值，调整平面拟合精度
   int ransacIter = 500;                     // RANSAC迭代次数，值越高拟合越准
   int minPlanePoints = 50;                  // 最小平面点数，过滤小平面
