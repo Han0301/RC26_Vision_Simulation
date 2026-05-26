@@ -4,94 +4,137 @@
 #include <stdexcept>
 #include <ros/ros.h>
 #include "camera.h"
-#include "./Plane_FitLocator/debug_pcl.h"
-#include "./Plane_FitLocator/post_pcl.h"
-#include "./Plane_FitLocator/pre_pcl.h"
-#include "./Plane_FitLocator/set_pcl.h"
+#include "./PnP/pnp_main.h"
 
-void test1(ros::NodeHandle& nh)
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
+#include <librealsense2/rs.hpp>
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <boost/foreach.hpp>
+
+rosbag::Bag g_bag;
+rosbag::View* g_view = nullptr;
+rosbag::View::iterator g_msg_iter;
+
+void save_native_frames(
+    ros::Publisher& color_pub,
+    ros::Publisher& depth_pub,
+    const Ten::camera_frame& frame
+)
 {
-    Ten::Ten_camera& _CAMERA_ = Ten::Ten_camera::GetInstance();
-
-    // 窗口
-    cv::namedWindow("bgr_frame", cv::WINDOW_NORMAL);
-    cv::resizeWindow("bgr_frame", 640, 480);
-    cv::namedWindow("depth_frame", cv::WINDOW_NORMAL);
-    cv::resizeWindow("depth_frame", 640, 480);
-    _CAMERA_.reset_camera_depth(640, 480,30);
-
-    Ten::Plane_FitLocator::Ten_debug_pcl _DEBUG_PCL_;
-    Ten::Plane_FitLocator::Ten_pre_pcl _PRE_PCL_;
-    Ten::Plane_FitLocator::Ten_set_pcl _SET_PCL_;
-    Ten::Plane_FitLocator::Ten_post_pcl _POST_PCL_;
-    Ten::Plane_FitLocator::Plane_Info plane_info;
-
-    // 点云
-    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-
-    // 参数
-    rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();    // 彩色内参 → 绘图用
-
-    while (ros::ok())
+    // 直接判断 cv::Mat 是否为空
+    if (frame.bgr_image.empty() || frame.depth_image.empty())
     {
-        Ten::camera_frame frame = _CAMERA_.camera_read_depth();
-
-        if (frame.bgr_image.empty() || frame.depth_image.empty())
-        {
-            std::cout << "frame.bgr_image.empty() || frame.depth_image.empty()" << std::endl;
-            continue;
-        }
-
-        cv::Mat draw_bgr, draw_depth;
-
-        cv::Mat depth_show;
-        cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-        cv::imshow("depth_frame", depth_show); 
-
-        // 设置点云
-        _SET_PCL_.set_Pcl_Cloud(frame.raw_depth_frame, color_intr, input_cloud);
-        // 滤波器
-        _PRE_PCL_.cloud_filter(input_cloud,output_cloud);      // 设置点云
-        // 提取平面和中心点，法向量
-        bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud, plane_info);
-
-        // 方形拟合
-        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_2d_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        _POST_PCL_.compute_CenterAndNormal(plane_cloud,plane_info);
-        _POST_PCL_.set_2d_cloud(plane_cloud,plane_info, plane_2d_cloud);
-        _POST_PCL_.set_RPY(plane_2d_cloud,plane_info);
-
-        cv::Mat debug_image;
-        // _DEBUG_PCL_.debug_rgb_image(frame.bgr_image,plane_info, color_intr,debug_image);
-        _DEBUG_PCL_.debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
-        cv::imshow("bgr_frame", debug_image);
-
-        _DEBUG_PCL_.publish_pointcloud(plane_cloud);          // 发布点云
-        _DEBUG_PCL_.publish_PlaneTF(plane_info);
-
-
-        char key = cv::waitKey(1);
-        if (key == 27)
-        {
-            break;
-        }
-        ros::spinOnce();
+        std::cout << "[ERROR] 帧数据为空" << std::endl;
+        return;
     }
+    ros::Time stamp = ros::Time::now();
 
-    cv::destroyAllWindows();
+    // 发布彩色图（不变）
+    cv_bridge::CvImage color_msg;
+    color_msg.header.stamp = stamp;
+    color_msg.encoding = sensor_msgs::image_encodings::BGR8;
+    color_msg.image = frame.bgr_image.clone();
+    color_pub.publish(color_msg.toImageMsg());
 
+    // 发布深度图 → 直接用 frame.depth_image（cv::Mat），无 memcpy
+    cv_bridge::CvImage depth_msg;
+    depth_msg.header.stamp = stamp;
+    depth_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+    depth_msg.image = frame.depth_image.clone(); // 直接赋值
+    depth_pub.publish(depth_msg.toImageMsg());
 }
 
+bool init_bag_player(const std::string& bag_path)
+{
+    try
+    {
+        g_bag.open(bag_path, rosbag::bagmode::Read);
+        std::vector<std::string> topics = {"/camera/color/image_raw","/camera/depth/image_raw"};
+        g_view = new rosbag::View(g_bag, rosbag::TopicQuery(topics));
+        g_msg_iter = g_view->begin();
+
+        std::cout << "✅ bag初始化成功" << std::endl;
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "❌ 初始化失败：" << e.what() << std::endl;
+        return false;
+    }
+}
+
+
+Ten::camera_frame get_next_frame_from_bag()
+{
+    Ten::camera_frame frame;
+    cv::Mat color_img, depth_img;
+
+    while (g_msg_iter != g_view->end())
+    {
+        rosbag::MessageInstance const msg = *g_msg_iter;
+        ++g_msg_iter;
+
+        // 彩色图（不变）
+        if (msg.getTopic() == "/camera/color/image_raw")
+        {
+            auto img_msg = msg.instantiate<sensor_msgs::Image>();
+            if (img_msg) color_img = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::BGR8)->image;
+        }
+        // 深度图（不变）
+        if (msg.getTopic() == "/camera/depth/image_raw")
+        {
+            auto img_msg = msg.instantiate<sensor_msgs::Image>();
+            if (img_msg) depth_img = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::TYPE_16UC1)->image;
+        }
+
+        // 仅赋值 cv::Mat，删除 raw_depth_frame 相关代码
+        if (!color_img.empty() && !depth_img.empty())
+        {
+            frame.bgr_image = color_img;
+            frame.depth_image = depth_img;
+            return frame;
+        }
+    }
+
+    std::cout << "🔄 bag循环播放" << std::endl;
+    g_msg_iter = g_view->begin();
+    return get_next_frame_from_bag();
+}
 
 
 int main(int argc, char** argv)
 {
-    // 初始化ROS节点
     ros::init(argc, argv, "test_node");
     ros::NodeHandle nh;
-    
-    test1(nh);
+    ros::Publisher color_image_pub = nh.advertise<sensor_msgs::Image>("/camera/color/image_raw", 30);
+    ros::Publisher depth_image_pub = nh.advertise<sensor_msgs::Image>("/camera/depth/image_raw", 30);
+
+    Ten::Ten_camera& _CAMERA_ = Ten::Ten_camera::GetInstance();
+    _CAMERA_.reset_camera_depth(640, 480, 30);
+    rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();
+    Ten::KFS::kfsLocator pnp_hander(color_intr);
+
+    std::string bag_path = "/home/h/camera_native_dat.bag";
+    if (!init_bag_player(bag_path)) return -1;
+
+    ros::Rate loop_rate(30);
+    while (ros::ok())
+    {
+        // 读取frame的方式
+        Ten::camera_frame frame = get_next_frame_from_bag();
+        // Ten::camera_frame frame = _CAMERA_.camera_read_depth();
+
+        pnp_hander.processOneFrame(frame.bgr_image, frame.depth_image);
+
+        // save_native_frames(color_image_pub, depth_image_pub, frame);
+        ros::spinOnce();
+        loop_rate.sleep();
+    }
+
+    delete g_view;
+    g_bag.close();
     return 0;
 }

@@ -31,7 +31,7 @@ struct kfsPnpConfig
 
   struct red
   {
-    int labLMin = 0;                          // LAB颜色L通道最小值
+    int labLMin = 30;                          // LAB颜色L通道最小值
     int labLMax = 255;                        // LAB颜色L通道最大值
     int labAMin = 135;                        // LAB颜色A通道最小值
     int labAMax = 255;                        // LAB颜色A通道最大值
@@ -41,12 +41,12 @@ struct kfsPnpConfig
 
   struct blue
   {
-    int labLMin = 0;                          // LAB颜色L通道最小值
+    int labLMin = 30;                          // LAB颜色L通道最小值
     int labLMax = 255;                        // LAB颜色L通道最大值
     int labAMin = 120;                        // LAB颜色A通道最小值
     int labAMax = 180;                        // LAB颜色A通道最大值
     int labBMin = 50;                          // LAB颜色B通道最小值
-    int labBMax = 125;                        // LAB颜色B通道最大值
+    int labBMax = 116;                        // LAB颜色B通道最大值
   };
   kfsPnpConfig::red red;
   kfsPnpConfig::blue blue;

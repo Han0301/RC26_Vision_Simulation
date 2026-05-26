@@ -45,7 +45,7 @@ public:
 
     void publish_pointcloud(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& pcl_cloud,
-        std::string frame_id = "camera_color_optical_frame"
+        std::string frame_id = "map"
     )
     {
         if (!pcl_pub_ || pcl_cloud->empty()) return;

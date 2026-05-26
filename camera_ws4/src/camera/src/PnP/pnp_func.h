@@ -98,16 +98,16 @@ public:
   kfsPnpOutput process(
     const cv::Mat& colorBgr, 
     const rs2_intrinsics& color_intr,
-    std::shared_ptr<rs2::depth_frame> depth_frame = nullptr
+    const cv::Mat& depth_frame
 )
   {
     // 初始化输出对象
     kfsPnpOutput out;
 
     // 判断输入图像是否为空 || 验证智能指针本身非空 || 验证 RealSense 深度帧对象有效
-    if (colorBgr.empty() || (!depth_frame) || (!(*depth_frame)) )
+    if (colorBgr.empty() || depth_frame.empty() )
     {
-      out.status = "pointcloud_process: colorBgr.empty() || (!depth_frame) || (!(*depth_frame))";
+      out.status = "colorBgr.empty() || depth_frame.empty()";
       return out;
     }
 
@@ -227,16 +227,16 @@ private:
     // 闭运算填充空洞
     cv::morphologyEx(outMask, outMask, cv::MORPH_CLOSE, kernel);
 
-    // 计算图像中心点坐标
-    int cx = src.cols / 2;
-    int cy = src.rows / 2;
+    // // 计算图像中心点坐标
+    // int cx = src.cols / 2;
+    // int cy = src.rows / 2;
 
-    // 获取中心点的 Lab 像素值 (OpenCV 中 Lab 存储为 0~255)
-    cv::Vec3b center_lab = lab.at<cv::Vec3b>(cy, cx);
-    int L = center_lab[0];  // L通道
-    int a = center_lab[1];  // a通道
-    int b = center_lab[2];  // b通道
-    std::cout << "L: " << L << ",a: " << a << ",b: " << b << std::endl;
+    // // 获取中心点的 Lab 像素值 (OpenCV 中 Lab 存储为 0~255)
+    // cv::Vec3b center_lab = lab.at<cv::Vec3b>(cy, cx);
+    // int L = center_lab[0];  // L通道
+    // int a = center_lab[1];  // a通道
+    // int b = center_lab[2];  // b通道
+    // std::cout << "L: " << L << ",a: " << a << ",b: " << b << std::endl;
 
     // 提取图像轮廓
     std::vector<std::vector<cv::Point>> contours;
@@ -285,7 +285,7 @@ private:
   }
 
   // ROI区域转换为三维点云
-  void convertRoiToCloud(std::shared_ptr<rs2::depth_frame> depth_frame,
+  void convertRoiToCloud(const cv::Mat& depth_frame,
                                 const cv::Rect& roi,
                                 const cv::Mat& target_mask,
                                 const rs2_intrinsics& color_intr,
@@ -293,8 +293,8 @@ private:
   {
     // 清空并预分配点云内存
     cloud->clear();
-    int w = depth_frame->get_width();
-    int h = depth_frame->get_height();
+    int w = depth_frame.cols;
+    int h = depth_frame.rows;
 
     // 遍历ROI区域像素
     const int start_v = std::max(0, roi.y - cfg_.roi_padding);
@@ -310,7 +310,7 @@ private:
         if (target_mask.at<uint8_t>(v, u) == 0) continue;
 
         // 获取深度值
-        float z = depth_frame->get_distance(u, v); 
+        float z = depth_frame.ptr<uint16_t>(v)[u] * 0.001f;
         int z_mm = int(z * 1000);
 
         // 过滤无效深度

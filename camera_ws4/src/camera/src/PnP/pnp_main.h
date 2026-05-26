@@ -11,6 +11,7 @@
 #include "../camera.h"
 #include "pnp_func.h"
 #include "../method_math.h"
+#include "pnp_debug.h"
 
 namespace Ten
 {
@@ -40,27 +41,42 @@ public:
             0, color_intr.fy, color_intr.ppy,
             0, 0, 1);
         distCoeffs_ = cv::Mat::zeros(5,1,CV_64F);
+        pnp_debug.init();  
     }
 
-    inline kfsPnpOutput processOneFrame(const cv::Mat color,std::shared_ptr<rs2::depth_frame> depth_frame = nullptr)
+    void processOneFrame(const cv::Mat color,const cv::Mat depth_frame)
     {
         kfsPnpOutput out = solver_.process(color,color_intr_,depth_frame);
 
         set_lastest_center(out);
-        if (!out.valid)
+        Ten::XYZRPY center = get_lastest_center();
+
+        if (out.status != "ok")
         {
-            return out;
+            std::cout << "status: " << out.status << std::endl;
         }
-        return out;
+
+        // debug 部分
+        pnp_debug.draw(color, out, color_intr_);
+        char key = cv::waitKey(1);
+        if (key == 27) return;
+        pnp_debug.publish_pointcloud(out.cloudFiltered);  
+
+        std::cout << "center_bias: " << out.center.x() << std::endl;
+        // std::cout << "解算结果：" << center._xyz._x << " " 
+        //     << center._xyz._y << " " 
+        //     << center._xyz._z << std::endl;
     }
 
+
+
     // 取到中心点位姿
-    inline Ten::XYZRPY get_lastest_center() const
+    Ten::XYZRPY get_lastest_center() const
     {
         return lastest_center;
     }
 
-    inline void setWorldBias(double x, double y, double z)
+    void setWorldBias(double x, double y, double z)
     {
         world_bias_x_ = x;
         world_bias_y_ = y;
@@ -72,6 +88,7 @@ private:
     rs2_intrinsics color_intr_;
     cv::Mat cameraMatrix_;
     cv::Mat distCoeffs_;
+    Ten::KFS::DebugDrawer pnp_debug;
 
     Ten::XYZRPY lastest_center;
 
@@ -79,7 +96,7 @@ private:
     double world_bias_y_ = 0.08995 -0.0175 -0.015;
     double world_bias_z_ = 0.07470 - 0.0125;
 
-    inline void set_lastest_center(const kfsPnpOutput& input)
+    void set_lastest_center(const kfsPnpOutput& input)
     {
         // 坐标转换
         Eigen::Vector3f worldCenter = kCamToWorld * input.center;

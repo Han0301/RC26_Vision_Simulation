@@ -85,24 +85,7 @@ void test_pnp(ros::NodeHandle& nh)
         }
         show_lab_value_on_click(frame.bgr_image);
 
-        Ten::KFS::kfsPnpOutput pnp_result = pnp_hander.processOneFrame(frame.bgr_image, frame.raw_depth_frame);
-        pnp_debug.draw(frame.bgr_image, pnp_result, color_intr);
-
-        double x, y, z, yaw;
-        Ten::XYZRPY center = pnp_hander.get_lastest_center();
-        if (pnp_result.status != "ok")
-        {
-            std::cout << "status: " << pnp_result.status << std::endl;
-        }
-        std::cout << "解算结果：" << center._xyz._x << " " 
-                << center._xyz._y << " " 
-                << center._xyz._z << std::endl;
-
-        pnp_debug.publish_pointcloud(pnp_result.cloudFiltered);   
-
-        char key = cv::waitKey(1);
-        if (key == 27) break;
-
+        pnp_hander.processOneFrame(frame.bgr_image, frame.depth_image);
         ros::spinOnce();
     }
 
