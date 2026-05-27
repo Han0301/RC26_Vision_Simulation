@@ -41,25 +41,24 @@ struct kfsPnpConfig
 
   struct blue
   {
-    int labLMin = 30;                          // LAB颜色L通道最小值
+    int labLMin = 0;                          // LAB颜色L通道最小值
     int labLMax = 255;                        // LAB颜色L通道最大值
     int labAMin = 120;                        // LAB颜色A通道最小值
     int labAMax = 180;                        // LAB颜色A通道最大值
     int labBMin = 50;                          // LAB颜色B通道最小值
-    int labBMax = 116;                        // LAB颜色B通道最大值
+    int labBMax = 120;                        // LAB颜色B通道最大值
   };
   kfsPnpConfig::red red;
   kfsPnpConfig::blue blue;
 
   int roi_padding = 0;
-  int CloudDepth_min = 100;
+  int CloudDepth_min = 300;
   int CloudDepth_max = 2000;
   float voxelLeaf = 0.008f;                  // 体素滤波大小，值越大点云越稀疏
   
   float ClusterTolerance = 0.016;
 
-  float Areas_min_bias = 0.0225;
-  float size_min_bias = 0.03;
+  float size_min_bias = 0.06;
 
   double ransacDist = 0.012;                 // RANSAC平面距离阈值，调整平面拟合精度
   int ransacIter = 500;                     // RANSAC迭代次数，值越高拟合越准

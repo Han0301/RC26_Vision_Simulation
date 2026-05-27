@@ -24,6 +24,7 @@
 #include <pcl/registration/icp.h>
 #include "pnp_param.h"
 #include "../camera.h"
+#include "../openvino.h"
 
 namespace Ten
 {
@@ -72,10 +73,12 @@ public:
   // 构造函数
   explicit kfsPnpSolver(const kfsPnpConfig& cfg, const rs2_intrinsics& color_intr)
       : cfg_(cfg),
+        color_intr_(color_intr),
         inliers(new pcl::PointIndices),
         coeff(new pcl::ModelCoefficients),
         plane(new pcl::PointCloud<pcl::PointXYZ>),
-        remain(new pcl::PointCloud<pcl::PointXYZ>)
+        remain(new pcl::PointCloud<pcl::PointXYZ>),
+        detector("/home/h/下载/卷轴检测_han2/best","cpu",0,0.5,0.5)
   {
     // 覆盖相机内参参数
     cfg_.fx = color_intr.fx;
@@ -97,7 +100,6 @@ public:
    */
   kfsPnpOutput process(
     const cv::Mat& colorBgr, 
-    const rs2_intrinsics& color_intr,
     const cv::Mat& depth_frame
 )
   {
@@ -111,29 +113,35 @@ public:
       return out;
     }
 
-    // 提取红色目标ROI区域
+    // // 提取红色目标ROI区域
     out.roi = getRedRoi(colorBgr, out.kfs_Mask);
 
-    // 判断ROI是否有效
+    // out.roi = test_yolo2(colorBgr);
+
+    // // 判断ROI是否有效
     if (out.roi.area() <= 0)
     {
       out.status = "no red roi";
       return out;
     }
-
+    
     // ROI区域转换为三维点云
-    convertRoiToCloud(depth_frame, out.roi, out.kfs_Mask, color_intr, out.cloudRaw);
+    convertRoiToCloud(depth_frame, out.roi, out.kfs_Mask, out.cloudRaw);
 
     // 判断原始点云是否为空
-    if (out.cloudRaw->empty())
+    if (out.cloudRaw->empty() || out.cloudRaw->size() > 80000)
     {
-      out.status = "empty roi cloud";
+      out.status = "out.cloudRaw->empty() || out.cloudRaw->size() > 80000";
       return out;
     }
+
+    // set_Pcl_Cloud(depth_frame,color_intr,out.cloudRaw);
+    std::cout << "out.cloudRaw.size(): " << out.cloudRaw->size() << std::endl;
 
     // 点云预处理（降采样 + 欧式聚类）
     voxel_Downsample(out.cloudRaw, out.cloudFiltered);
     euclidean_filter(out.cloudFiltered,out.cloudFiltered);
+    std::cout << "out.cloudFiltered.size(): " << out.cloudFiltered->size() << std::endl;
 
     // 判断滤波后点云是否为空
     if (!out.cloudFiltered || out.cloudFiltered->empty())
@@ -201,6 +209,49 @@ public:
   }
 
 private:
+
+  cv::Rect test_yolo2(const cv::Mat &img)
+  {
+      // 调用worker函数
+      cv::Mat image = img.clone();
+      std::vector<Ten::Detection> results = detector.worker(image);
+
+      if(results.size() == 0)
+      {
+        return cv::Rect();
+      }
+
+      // 遍历框，计算其中面积最大的
+      // Ten::Detection best;
+      // double max_square = 0;
+      // for (int i = 0; i < results.size(); i++)
+      // {
+      //     double square = results[i].w_ * results[i].h_;
+      //     if (square > max_square)
+      //     {
+      //         best = results[i];
+      //         max_square = square;
+      //     }
+      // }
+      std::sort(results.begin(), results.end(),
+                [](const Ten::Detection &det1, const Ten::Detection &det2) -> bool
+                {
+                    double s1 = det1.w_ * det1.h_;
+                    double s2 = det2.w_ * det2.h_;
+                    return s1 > s2;
+                });
+      Ten::Detection best = results[0];
+
+      // 归一化
+      float x1 = best.cx_ - best.w_ / 2;
+      float x2 = best.cx_ + best.w_ / 2;
+      float y1 = best.cy_ - best.h_ / 2;
+      float y2 = best.cy_ + best.h_ / 2;
+
+      return cv::Rect(cv::Point2i(x1, y1), cv::Point2i(x2, y2));
+  }
+
+
   // 提取红色目标ROI区域
   cv::Rect getRedRoi(const cv::Mat& src, cv::Mat& outMask) const
   {
@@ -288,7 +339,6 @@ private:
   void convertRoiToCloud(const cv::Mat& depth_frame,
                                 const cv::Rect& roi,
                                 const cv::Mat& target_mask,
-                                const rs2_intrinsics& color_intr,
                                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) const
   {
     // 清空并预分配点云内存
@@ -307,7 +357,7 @@ private:
       for (int u = start_u; u < end_u; u++)
       {
         // 跳过非方块区域
-        if (target_mask.at<uint8_t>(v, u) == 0) continue;
+        // if (target_mask.at<uint8_t>(v, u) == 0) continue;
 
         // 获取深度值
         float z = depth_frame.ptr<uint16_t>(v)[u] * 0.001f;
@@ -320,7 +370,7 @@ private:
         // 反投影
         float pixel[2] = {(float)u, (float)v};
         float point3d[3] = {0};
-        rs2_deproject_pixel_to_point(point3d, &color_intr, pixel, z);
+        rs2_deproject_pixel_to_point(point3d, &color_intr_, pixel, z);
         
         pcl::PointXYZ p;
         p.x = point3d[0];
@@ -328,6 +378,46 @@ private:
         p.z = point3d[2];
         cloud->push_back(p);
       }
+    }
+  }
+
+  /**
+   * @brief 根据深度图像， 内参， 直接转成pcl点云
+   * @param depth_frame       原生深度帧
+   * @param color_intr        彩色相机内参
+   * @param pcl_cloud         输出的pcl_cloud点云
+  */
+  void set_Pcl_Cloud(
+    const cv::Mat& depth_frame,
+    const rs2_intrinsics& color_intr,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& pcl_cloud
+  )
+  {
+    pcl_cloud->clear();
+    int w = depth_frame.cols;
+    int h = depth_frame.rows;
+
+    for (int v = 0; v < h; v++) {
+      for (int u = 0; u < w; u++) {
+        // 原生精准深度（0.1mm精度，斜视角无误差）
+        float z = depth_frame.ptr<uint16_t>(v)[u] * 0.001f;
+        int z_mm = int(z * 1000);
+
+        // 过滤无效深度
+        if (z <= 0 || z_mm < cfg_.CloudDepth_min || z_mm > cfg_.CloudDepth_max)
+          continue;
+
+        // 反投影（align后用彩色内参，坐标系100%对齐）
+        float pixel[2] = {(float)u, (float)v};
+        float point3d[3] = {0};
+        rs2_deproject_pixel_to_point(point3d, &color_intr, pixel, z);
+        
+        pcl::PointXYZ p;
+        p.x = point3d[0];
+        p.y = point3d[1];
+        p.z = point3d[2];
+        pcl_cloud->push_back(p);
+        }
     }
   }
 
@@ -579,11 +669,10 @@ private:
       const Eigen::Vector3f bodyCenter = faceCenter - n * static_cast<float>(cfg_.objectSize * 0.5);
       const float faceArea = rect.size.width * rect.size.height;
       // std::cout << "faceArea: " << faceArea << std::endl;
-      // std::cout << "width: " << rect.size.width << ",height: " << rect.size.height << std::endl;
+      std::cout << "width: " << rect.size.width << ",height: " << rect.size.height << std::endl;
  
        // 保存平面数据
-      if (std::abs(faceArea - cfg_.objectSize * cfg_.objectSize) < cfg_.Areas_min_bias
-          && std::abs(rect.size.width - cfg_.objectSize) < cfg_.size_min_bias
+      if (std::abs(rect.size.width - cfg_.objectSize) < cfg_.size_min_bias
           && std::abs(rect.size.height - cfg_.objectSize) < cfg_.size_min_bias)
       {
         planes.push_back({n, bodyCenter, static_cast<int>(clouds[i]->size()), planes.size(), faceArea});
@@ -903,6 +992,7 @@ private:
 
 private:
   kfsPnpConfig cfg_;                                          // 算法配置参数
+  rs2_intrinsics color_intr_;
   std::vector<Eigen::Vector3f> centerWindow_;                // 位姿平滑窗口
   std::vector<Eigen::Quaternionf> orientationWindow_;         // 旋转平滑窗口
 
@@ -920,6 +1010,8 @@ private:
   std::vector<Eigen::Vector3f> prevPlaneNormals_;            // 上一帧平面法向量
   pcl::PointCloud<pcl::PointXYZ>::Ptr prevCloud_;            // 上一帧点云
   Eigen::Affine3f prevPose_ = Eigen::Affine3f::Identity();   // 上一帧位姿
+
+  Ten::Ten_yolo detector;
 };
 
 } // namespace KFS

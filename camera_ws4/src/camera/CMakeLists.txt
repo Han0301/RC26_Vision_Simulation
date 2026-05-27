@@ -195,6 +195,7 @@ target_sources(test_node
   PRIVATE
   src/camera.cpp
   src/method_math.cpp
+  src/openvino.cpp
 )
 
 target_link_libraries(test_node
@@ -208,6 +209,7 @@ target_sources(test_pnp_node
   PRIVATE
   src/camera.cpp
   src/method_math.cpp
+  src/openvino.cpp
 )
 
 

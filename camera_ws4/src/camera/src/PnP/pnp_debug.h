@@ -33,6 +33,7 @@ public:
     DebugDrawer()
     {
         pcl_pub_ = nh.advertise<sensor_msgs::PointCloud2>(topic_name, 10);
+        pnp_debug_img_pub = nh.advertise<sensor_msgs::Image>("/kfs/debug_image", 10);
     };
 
     // 👇 所有函数直接在类内实现，自动内联，无多重定义
@@ -93,8 +94,58 @@ public:
         }
     }
 
+    void publishPnpDebugImage(
+        const cv::Mat& color,
+        const kfsPnpOutput& pnp_out,
+        const rs2_intrinsics& color_intr
+    )
+    {
+        // 空图像直接返回
+        if (color.empty())
+            return;
+
+        // —————————— 1:1 复刻原 draw 函数的图像处理逻辑 ——————————
+        cv::Mat img = color.clone();
+        try
+        {
+            if (!pnp_out.valid)
+            {
+                cv::putText(img, "STATUS: DETECTING...", cv::Point(20, 40),
+                    cv::FONT_HERSHEY_SIMPLEX, config_.font_scale,
+                    cv::Scalar(0, 0, 255), config_.line_thickness);
+            }
+            else
+            {
+                cv::rectangle(img, pnp_out.roi, cv::Scalar(0, 255, 255), config_.line_thickness);
+                drawAllPlanes(img, pnp_out.planeClouds, color_intr);  // 原有绘制函数
+                drawPoseAxis(img, pnp_out, color_intr);              // 原有绘制函数
+
+                char buf[256];
+                snprintf(buf, sizeof(buf), "X:%.2f Y:%.2f Z:%.2f",
+                    pnp_out.center.x(), pnp_out.center.y(), pnp_out.center.z());
+                cv::putText(img, buf, cv::Point(20, 80),
+                    cv::FONT_HERSHEY_SIMPLEX, config_.font_scale,
+                    cv::Scalar(0, 255, 0), config_.line_thickness);
+            }
+        }
+        catch (...)
+        {
+            // 异常不崩溃
+        }
+
+        // —————————— 发布处理后的图像到ROS话题 ——————————
+        cv_bridge::CvImage cv_msg;
+        cv_msg.header.stamp = ros::Time::now();
+        cv_msg.encoding = sensor_msgs::image_encodings::BGR8;
+        cv_msg.image = img;
+
+        sensor_msgs::ImagePtr msg = cv_msg.toImageMsg();
+        pnp_debug_img_pub.publish(msg);
+    }
+
 private:
     ros::Publisher pcl_pub_;
+    ros::Publisher pnp_debug_img_pub;
     ros::NodeHandle nh;
     std::string topic_name = "/camera/pointcloud";
 

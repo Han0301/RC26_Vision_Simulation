@@ -13,22 +13,15 @@
 #include "../method_math.h"
 #include "pnp_debug.h"
 
+#define _camera_x_bias_ 0
+#define _camera_y_bias_ 0
+#define _camera_z_bias_ 0
+
+#define max_bias 0.2    // 约束 -max_bias 到 max_bias
 namespace Ten
 {
 namespace KFS
 {
-
-// 相机坐标系 → 世界坐标系 
-static const Eigen::Matrix3f kCamToWorld = []()
-{
-    Eigen::Matrix3f R;
-    R << 0.0f, 0.0f, 1.0f,
-         -1.0f, 0.0f, 0.0f,
-         0.0f, -1.0f, 0.0f;
-    return R;
-}();
-static const Eigen::Quaternionf kCamToWorldQ(kCamToWorld);
-
 class kfsLocator
 {
 public:
@@ -42,14 +35,12 @@ public:
             0, 0, 1);
         distCoeffs_ = cv::Mat::zeros(5,1,CV_64F);
         pnp_debug.init();  
+        center_bias = 0.0;
     }
 
-    void processOneFrame(const cv::Mat color,const cv::Mat depth_frame)
+    double processOneFrame(const cv::Mat color_frame,const cv::Mat depth_frame, bool debug_mode = false)
     {
-        kfsPnpOutput out = solver_.process(color,color_intr_,depth_frame);
-
-        set_lastest_center(out);
-        Ten::XYZRPY center = get_lastest_center();
+        kfsPnpOutput out = solver_.process(color_frame,depth_frame);
 
         if (out.status != "ok")
         {
@@ -57,57 +48,48 @@ public:
         }
 
         // debug 部分
-        pnp_debug.draw(color, out, color_intr_);
-        char key = cv::waitKey(1);
-        if (key == 27) return;
-        pnp_debug.publish_pointcloud(out.cloudFiltered);  
+        if (debug_mode)
+        {
+            // pnp_debug.draw(color_frame, out, color_intr_);
+            // char key = cv::waitKey(1);
+            // if (key == 27) return 0;
+            pnp_debug.publish_pointcloud(out.cloudFiltered);  
+            pnp_debug.publishPnpDebugImage(color_frame, out, color_intr_);
+            current_roi_ = out.roi;
+        }
 
-        std::cout << "center_bias: " << out.center.x() << std::endl;
-        // std::cout << "解算结果：" << center._xyz._x << " " 
-        //     << center._xyz._y << " " 
-        //     << center._xyz._z << std::endl;
+        // 设置偏差值
+        set_camera_bias(out);
+        center_bias = double(-out.center.y());
+
+        if (-max_bias < center_bias && center_bias < max_bias)
+        {
+            center_bias = 0;
+        }
+
+        return center_bias;
     }
 
-
-
-    // 取到中心点位姿
-    Ten::XYZRPY get_lastest_center() const
-    {
-        return lastest_center;
+    cv::Rect getCurrentRoi__() const {
+        return current_roi_;
     }
-
-    void setWorldBias(double x, double y, double z)
-    {
-        world_bias_x_ = x;
-        world_bias_y_ = y;
-        world_bias_z_ = z;
-    }
-
+    
 private:
     kfsPnpSolver solver_;
-    rs2_intrinsics color_intr_;
     cv::Mat cameraMatrix_;
     cv::Mat distCoeffs_;
     Ten::KFS::DebugDrawer pnp_debug;
 
-    Ten::XYZRPY lastest_center;
+    cv::Rect current_roi_;
+    rs2_intrinsics color_intr_;
 
-    double world_bias_x_ = 0.0;
-    double world_bias_y_ = 0.08995 -0.0175 -0.015;
-    double world_bias_z_ = 0.07470 - 0.0125;
+    double center_bias;
 
-    void set_lastest_center(const kfsPnpOutput& input)
+    void set_camera_bias (kfsPnpOutput& out)
     {
-        // 坐标转换
-        Eigen::Vector3f worldCenter = kCamToWorld * input.center;
-        Eigen::Quaternionf worldOrient = kCamToWorldQ * input.orientation;
-
-        lastest_center._xyz._x = static_cast<double>(worldCenter.x()) + world_bias_x_;
-        lastest_center._xyz._y = static_cast<double>(worldCenter.y()) + world_bias_y_;
-        lastest_center._xyz._z = static_cast<double>(worldCenter.z()) + world_bias_z_;
-        lastest_center._rpy._yaw = static_cast<double>(
-            std::atan2(2.0 * (worldOrient.w() * worldOrient.z() + worldOrient.x() * worldOrient.y()),
-                    1.0 - 2.0 * (worldOrient.y() * worldOrient.y() + worldOrient.z() * worldOrient.z())));
+        out.center.x() = out.center.x() + _camera_x_bias_;
+        out.center.y() = out.center.y() + _camera_y_bias_;
+        out.center.z() = out.center.z() + _camera_z_bias_;
     }
 };
 
