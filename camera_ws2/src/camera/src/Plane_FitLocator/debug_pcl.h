@@ -224,24 +224,18 @@ public:
         const Eigen::Vector3d& center = plane_info.plane_center;
 
         // 1. 用法向量构建基础坐标系
-        const Eigen::Vector3d& n = plane_info.plane_normal;
-        Eigen::Vector3d norm_n = n;
-        norm_n.normalize();
+        Eigen::Vector3d n = plane_info.plane_normal;
+        n.normalize();
         Eigen::Vector3d x_axis, y_axis;
-        if (std::fabs(norm_n.z()) < 0.999) {
-            x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
-        } else {
-            x_axis = Eigen::Vector3d(0, 1, 0).cross(norm_n).normalized();
-        }
-        y_axis = norm_n.cross(x_axis).normalized();
+        // 【和set_vector_2d/set_RPY用完全一样的坐标系函数】
+        getLocalAxes(n, x_axis, y_axis); 
 
-        // 2. 初始旋转矩阵
         Eigen::Matrix3d rot_mat;
         rot_mat.col(0) = x_axis;
         rot_mat.col(1) = y_axis;
-        rot_mat.col(2) = norm_n;
+        rot_mat.col(2) = n;
 
-        // 3. 叠加最优Yaw，和TF对齐
+        // 叠加最终yaw（和set_RPY完全一致）
         double yaw = plane_info.plane_euler._yaw;
         Eigen::Matrix3d rot_yaw;
         rot_yaw << cos(yaw), -sin(yaw), 0,
@@ -313,6 +307,29 @@ public:
 
 
 private:
+
+    void getLocalAxes(const Eigen::Vector3d& n,
+                                    Eigen::Vector3d& x_axis,
+                                    Eigen::Vector3d& y_axis)
+    {
+        // 法向量归一化
+        Eigen::Vector3d norm_n = n;
+        norm_n.normalize();
+
+        // 计算局部X轴
+        // if (std::fabs(norm_n.z()) < 0.999)
+        // {
+        //     x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
+        // }
+        // else
+        // {
+        //     x_axis = Eigen::Vector3d(0, 1, 0).cross(norm_n).normalized();
+        // }
+
+        x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
+        // 计算局部Y轴
+        y_axis = norm_n.cross(x_axis).normalized();
+    }
 
 };
 

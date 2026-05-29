@@ -49,12 +49,17 @@ void test1(ros::NodeHandle& nh)
         bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud, plane_info);
 
         // 方形拟合
-        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_2d_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_fited(new pcl::PointCloud<pcl::PointXYZ>);      // 对平面点云二次进行欧式聚类等滤波处理
+        std::vector<cv::Point2f> plane_points_2d;
+        std::vector<cv::Point2f> plane_points_flited;
         _POST_PCL_.compute_CenterAndNormal(plane_cloud,plane_info);
-        _POST_PCL_.set_2d_cloud(plane_cloud,plane_info, plane_2d_cloud);
-        _POST_PCL_.set_RPY(plane_2d_cloud,plane_info);
+        _POST_PCL_.removePlaneNoise(plane_cloud, plane_cloud_fited);
+        _POST_PCL_.set_vector_2d(plane_cloud_fited,plane_info,plane_points_2d);
+        _POST_PCL_.central_range_filter(plane_points_2d,plane_points_flited);
+        _POST_PCL_.set_RPY(plane_points_flited,plane_info);
 
-        std::cout << "bias: " << -plane_info.plane_center.y() << std::endl;
+        std::cout << "bias: " << -plane_info.plane_center.y() 
+                  << ", yaw: " << plane_info.plane_euler._yaw << std::endl;
 
         // debug
         cv::Mat depth_show;

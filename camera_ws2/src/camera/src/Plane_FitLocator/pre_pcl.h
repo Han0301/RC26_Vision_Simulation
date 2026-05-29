@@ -22,7 +22,6 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/project_inliers.h>
 #include <pcl/common/transforms.h>
-#include "./../method_math.h"
 #include "post_pcl.h"
 
 #define MeanK  40                      // 统计滤波邻域点数，值越大滤波效果越强
