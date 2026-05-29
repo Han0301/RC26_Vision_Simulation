@@ -10,9 +10,12 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <tf2/LinearMath/Quaternion.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include "pre_pcl.h"
 
+#define BOX_SIZE 0.35
 namespace Ten
 {
 namespace Plane_FitLocator
@@ -20,18 +23,20 @@ namespace Plane_FitLocator
 class Ten_debug_pcl
 {
 public:
-    // 构造函数， 初始化节点
-    Ten_debug_pcl()
-    {
-        pcl_pub_ = nh.advertise<sensor_msgs::PointCloud2>(topic_name, 10);
-    }
-
     void publish_pointcloud(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& pcl_cloud,
-        std::string frame_id = "camera_color_optical_frame"
+        const std::string frame_id = "camera_color_optical_frame",
+        const std::string topic_name = "/camera/pointcloud"
     )
     {
-        if (!pcl_pub_ || pcl_cloud->empty()) return;
+        static ros::Publisher pcl_pub_;
+        if (!pcl_pub_)
+        {
+            ros::NodeHandle nh;
+            pcl_pub_ = nh.advertise<sensor_msgs::PointCloud2>(topic_name, 10);
+        }
+
+        if (pcl_cloud->empty()) return;
 
         // 转ROS消息并发布
         sensor_msgs::PointCloud2 ros_cloud;
@@ -89,46 +94,104 @@ public:
         tf_broadcaster.sendTransform(tf_msg);
     }
 
-    /**
-     * @brief 调试彩色图像
-     * @param iuput_image 输入图像
-     * @param plane_info 面的相关信息
-     * @param color_intr 彩色相机内参信息
-     * @param output_image 输出调试图像
-    */
-    void debug_rgb_image(
+    // 通用的 发布图像话题 函数
+    void pub_debug_image
+    (
+        const cv::Mat& debug_image,
+        const std::string debug_topic_name = "/kfs/debug_image"
+    )
+    {
+        static ros::Publisher debug_img_pub;
+        if (!debug_img_pub)
+        {
+            ros::NodeHandle nh;
+            debug_img_pub = nh.advertise<sensor_msgs::Image>(debug_topic_name, 10);
+        }
+
+        if (debug_image.empty())return;
+
+        cv_bridge::CvImage cv_msg;
+        cv_msg.header.stamp = ros::Time::now();
+        cv_msg.encoding = sensor_msgs::image_encodings::BGR8;
+        cv_msg.image = debug_image;
+
+        sensor_msgs::ImagePtr msg = cv_msg.toImageMsg();
+        debug_img_pub.publish(msg);
+    }
+
+    void set_debug_rgb_image(
         const cv::Mat& input_image,
         const Plane_Info& plane_info,
         const rs2_intrinsics& color_intr, 
         cv::Mat& output_image
     )
     {
+        // 1. 复制原图到输出图像，不修改原始图像
         output_image = input_image.clone();
-        Eigen::Vector3d center_3d = plane_info.plane_center;
 
-        // 1. 3D相机坐标 → 投影为2D像素坐标 (u, v)
-        float point3d[3] = {(float)center_3d.x(), (float)center_3d.y(), (float)center_3d.z()};
-        float pixel[2] = {0};
-        rs2_project_point_to_pixel(pixel, &color_intr, point3d);
-
-        int u = cvRound(pixel[0]);
-        int v = cvRound(pixel[1]);
-
-        // 2. OpenCV绘制：红色实心圆 (图像，圆心，半径，颜色，厚度)
-        if (u >= 0 && u < output_image.cols && v >= 0 && v < output_image.rows)
+        // 安全检查：图像为空
+        if (output_image.empty())
         {
-            cv::circle(output_image, cv::Point(u, v), 8, cv::Scalar(0, 0, 255), -1);
-            cv::putText(output_image, "Plane Center", cv::Point(u+10, v), 
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
-
-            char coord_text[100];
-            sprintf(coord_text, "X:%.3f Y:%.3f Z:%.3f", 
-                    center_3d.x(), center_3d.y(), center_3d.z());
-            
-            // 绘制在中心点下方，避免重叠
-            cv::putText(output_image, coord_text, cv::Point(u+10, v + 20), 
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
+            return;
         }
+
+        // 2. 提取 RealSense 相机内参
+        const double fx = color_intr.fx;
+        const double fy = color_intr.fy;
+        const double cx = color_intr.ppx;
+        const double cy = color_intr.ppy;
+
+        // 3. 获取平面3D中心点 & 法向量
+        const Eigen::Vector3d& center_3d = plane_info.plane_center;
+        const Eigen::Vector3d& normal_3d = plane_info.plane_normal;
+
+        // 安全检查：中心点深度必须为正（相机坐标系）
+        if (center_3d.z() < 0.01)
+        {
+            return;
+        }
+
+        // 4. 3D 中心点 投影 → 2D 像素坐标
+        cv::Point2d center_pt;
+        center_pt.x = fx * center_3d.x() / center_3d.z() + cx;
+        center_pt.y = fy * center_3d.y() / center_3d.z() + cy;
+
+        // 安全检查：中心点在图像范围内
+        if (center_pt.x < 0 || center_pt.x >= output_image.cols ||
+            center_pt.y < 0 || center_pt.y >= output_image.rows)
+        {
+            return;
+        }
+
+        // 5. 计算法向量终点（沿法向量方向延伸 0.2 米，可调整长度）
+        const double NORMAL_LENGTH = 0.2;
+        Eigen::Vector3d normal_end_3d = center_3d + normal_3d * NORMAL_LENGTH;
+
+        // 法向量终点投影 → 2D 像素
+        cv::Point2d end_pt;
+        end_pt.x = fx * normal_end_3d.x() / normal_end_3d.z() + cx;
+        end_pt.y = fy * normal_end_3d.y() / normal_end_3d.z() + cy;
+
+        // 6. 绘制可视化元素（红色：中心点+法向量）
+        const cv::Scalar COLOR_RED = cv::Scalar(0, 0, 255);
+        // 绘制平面中心点（实心圆）
+        cv::circle(output_image, center_pt, 8, cv::Scalar(0, 0, 255), -1);
+        cv::putText(output_image, "Plane Center", cv::Point(center_pt.x + 10, center_pt.y), 
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
+
+        char coord_text[100];
+        sprintf(coord_text, "X:%.3f Y:%.3f Z:%.3f", 
+                center_3d.x(), center_3d.y(), center_3d.z());
+        
+        // 绘制在中心点下方，避免重叠
+        cv::putText(output_image, coord_text, cv::Point(center_pt.x + 10, center_pt.y + 20), 
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
+
+        // 绘制法向量线段（穿过中心点）
+        cv::line(output_image, center_pt, end_pt, COLOR_RED, 2);
+        // 标注文字
+        cv::putText(output_image, "Plane Normal", center_pt + cv::Point2d(10, -5),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5, COLOR_RED, 1);
     }
 
     /**
@@ -138,16 +201,14 @@ public:
      * @param color_intr 彩色相机内参
      * @param output_image 输出调试图像
      */
-    void debug_plane_quadrilateral(
+    void set_debug_plane_quadrilateral(
         const cv::Mat& input_image,
         const Plane_Info& plane_info,
         const rs2_intrinsics& color_intr, 
         cv::Mat& output_image
     )
-    {
-        // ===================== 核心参数：35cm正方形固定尺寸 =====================
-        const double SQUARE_SIZE = 0.35;    
-        const double HALF_SIZE = SQUARE_SIZE / 2.0;
+    {  
+        const double HALF_SIZE = BOX_SIZE / 2.0;
 
         output_image = input_image.clone();
         std::vector<cv::Point> pixel_points;
@@ -252,9 +313,7 @@ public:
 
 
 private:
-ros::NodeHandle nh;
-ros::Publisher pcl_pub_;
-std::string topic_name = "/camera/pointcloud";
+
 };
 
 }       // namespace Plane_FitLocator

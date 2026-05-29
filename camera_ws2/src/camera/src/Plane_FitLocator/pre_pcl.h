@@ -27,10 +27,10 @@
 
 #define MeanK  40                      // 统计滤波邻域点数，值越大滤波效果越强
 #define StddevMulThresh 1.0f            // 统计滤波阈值，值越大保留点云越多
-#define leaf_size_XY 0.006f             // 体素滤波XY尺寸，值越大点云越稀疏
-#define leaf_size_Z  0.010f             // 体素滤波Z尺寸，值越大点云越稀疏
+#define leaf_size_XY 0.008f             // 体素滤波XY尺寸，值越大点云越稀疏
+#define leaf_size_Z  0.008f             // 体素滤波Z尺寸，值越大点云越稀疏
 #define DistanceThreshold 0.02f         // 平面拟合距离阈值，值越大拟合范围越大
-#define MaxIterations 1500              // 平面拟合迭代次数，值越大精度越高
+#define MaxIterations 600              // 平面拟合迭代次数，值越大精度越高
 
 namespace Ten
 {
@@ -41,24 +41,14 @@ namespace Plane_FitLocator
 class Ten_pre_pcl
 {
 public:
-    /**
-     * @brief 点云组合滤波
-     * @param input_pclclouds 输入原始点云
-     * @param out_pclclouds 输出滤波后点云
-     * @return 成功返回true，点云数量不足返回false
-     */
+
+    // 点云组合滤波
     bool cloud_filter(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_pclclouds,
         pcl::PointCloud<pcl::PointXYZ>::Ptr& out_pclclouds
     );
 
-    /**
-     * @brief 平面拟合与点云提取
-     * @param input_cloud 输入待处理点云
-     * @param output_cloud 输出平面内点云
-     * @param plane_info 输出平面参数信息
-     * @return 拟合成功返回true，失败返回false
-     */
+    // 平面拟合与点云提取
     bool Plane_fitter(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
         pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
@@ -144,6 +134,7 @@ void Ten_pre_pcl::statistical_filter(
     sor.filter(*out_pclclouds);
 }
 
+// 平面拟合器
 bool Ten_pre_pcl::ransac_Plane_Segment(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
     pcl::PointIndices::Ptr& plane_inliers,
@@ -196,10 +187,7 @@ bool Ten_pre_pcl::Plane_fitter(
 )
 {
     // 校验点云有效性
-    if (input_cloud->empty() || input_cloud->size() < 50)
-    {
-        return false;
-    }
+    if (input_cloud->empty() || input_cloud->size() < 50) return false;
 
     // 执行平面拟合
     pcl::PointIndices::Ptr plane_inliers(new pcl::PointIndices);

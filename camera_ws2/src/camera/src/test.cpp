@@ -12,12 +12,6 @@
 void test1(ros::NodeHandle& nh)
 {
     Ten::Ten_camera& _CAMERA_ = Ten::Ten_camera::GetInstance();
-
-    // 窗口
-    cv::namedWindow("bgr_frame", cv::WINDOW_NORMAL);
-    cv::resizeWindow("bgr_frame", 640, 480);
-    cv::namedWindow("depth_frame", cv::WINDOW_NORMAL);
-    cv::resizeWindow("depth_frame", 640, 480);
     _CAMERA_.reset_camera_depth(640, 480,30);
 
     Ten::Plane_FitLocator::Ten_debug_pcl _DEBUG_PCL_;
@@ -44,14 +38,11 @@ void test1(ros::NodeHandle& nh)
             continue;
         }
 
-        cv::Mat draw_bgr, draw_depth;
-
-        cv::Mat depth_show;
-        cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-        cv::imshow("depth_frame", depth_show); 
-
         // 设置点云
-        _SET_PCL_.set_Pcl_Cloud(frame.raw_depth_frame, color_intr, input_cloud);
+        cv::Rect roi = _SET_PCL_.set_roi_detect(frame.bgr_image);
+        _SET_PCL_.set_Pcl_Cloud(frame.depth_image, color_intr, roi,input_cloud);
+        std::cout << "input_cloud->size()" << input_cloud->size() << std::endl;
+
         // 滤波器
         _PRE_PCL_.cloud_filter(input_cloud,output_cloud);      // 设置点云
         // 提取平面和中心点，法向量
@@ -63,10 +54,17 @@ void test1(ros::NodeHandle& nh)
         _POST_PCL_.set_2d_cloud(plane_cloud,plane_info, plane_2d_cloud);
         _POST_PCL_.set_RPY(plane_2d_cloud,plane_info);
 
+        std::cout << "bias: " << -plane_info.plane_center.y() << std::endl;
+
+        // debug
+        cv::Mat depth_show;
         cv::Mat debug_image;
-        // _DEBUG_PCL_.debug_rgb_image(frame.bgr_image,plane_info, color_intr,debug_image);
-        _DEBUG_PCL_.debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
-        cv::imshow("bgr_frame", debug_image);
+
+        cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+        _DEBUG_PCL_.set_debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
+
+        _DEBUG_PCL_.pub_debug_image(depth_show, "depth_show");
+        _DEBUG_PCL_.pub_debug_image(debug_image, "debug_images");
 
         _DEBUG_PCL_.publish_pointcloud(plane_cloud);          // 发布点云
         _DEBUG_PCL_.publish_PlaneTF(plane_info);
