@@ -22,36 +22,54 @@ void test1(ros::NodeHandle& nh)
 
     // 点云
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filter_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_fited(new pcl::PointCloud<pcl::PointXYZ>); 
 
+    std::vector<cv::Point2f> plane_points_2d;
+    std::vector<cv::Point2f> plane_points_flited;
     // 参数
     rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();    // 彩色内参 → 绘图用
 
+    cv::Mat depth_show;
+    cv::Mat debug_image;
+
     while (ros::ok())
     {
+        // 设置输入图像
         Ten::camera_frame frame = _CAMERA_.camera_read_depth();
-
         if (frame.bgr_image.empty() || frame.depth_image.empty())
         {
             std::cout << "frame.bgr_image.empty() || frame.depth_image.empty()" << std::endl;
             continue;
         }
-
         // 设置点云
         cv::Rect roi = _SET_PCL_.set_roi_detect(frame.bgr_image);
-        _SET_PCL_.set_Pcl_Cloud(frame.depth_image, color_intr, roi,input_cloud);
-        std::cout << "input_cloud->size()" << input_cloud->size() << std::endl;
+        bool is_set = _SET_PCL_.set_Pcl_Cloud(frame.depth_image, color_intr, roi,input_cloud);
+        if (!is_set) 
+        {
+            std::cout << "set_Pcl_Cloud error!" << std::endl;
+            continue;
+        }
+
 
         // 滤波器
-        _PRE_PCL_.cloud_filter(input_cloud,output_cloud);      // 设置点云
+        bool is_filtted = _PRE_PCL_.cloud_filter(input_cloud,filter_cloud);      // 设置点云
+        if (!is_filtted)
+        {
+            std::cout << "cloud_filter error!" << std::endl;
+            continue;
+        }
         // 提取平面和中心点，法向量
-        bool ret = _PRE_PCL_.Plane_fitter(output_cloud, plane_cloud, plane_info);
+        bool is_plane_flitted = _PRE_PCL_.Plane_fitter(filter_cloud, plane_cloud, plane_info);
+        if (!is_plane_flitted)
+        {
+            std::cout << "Plane_fitter error!" << std::endl;
+            continue;
+        }
+        
 
         // 方形拟合
-        pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_fited(new pcl::PointCloud<pcl::PointXYZ>);      // 对平面点云二次进行欧式聚类等滤波处理
-        std::vector<cv::Point2f> plane_points_2d;
-        std::vector<cv::Point2f> plane_points_flited;
         _POST_PCL_.compute_CenterAndNormal(plane_cloud,plane_info);
         _POST_PCL_.removePlaneNoise(plane_cloud, plane_cloud_fited);
         _POST_PCL_.set_vector_2d(plane_cloud_fited,plane_info,plane_points_2d);
@@ -61,10 +79,7 @@ void test1(ros::NodeHandle& nh)
         std::cout << "bias: " << -plane_info.plane_center.y() 
                   << ", yaw: " << plane_info.plane_euler._yaw << std::endl;
 
-        // debug
-        cv::Mat depth_show;
-        cv::Mat debug_image;
-
+        // debug 部分
         cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
         _DEBUG_PCL_.set_debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr,debug_image);
 
@@ -84,7 +99,6 @@ void test1(ros::NodeHandle& nh)
     }
 
     cv::destroyAllWindows();
-
 }
 
 

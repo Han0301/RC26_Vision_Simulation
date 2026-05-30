@@ -94,10 +94,7 @@ bool Ten_pre_pcl::cloud_filter(
     statistical_filter(out_pclclouds, out_pclclouds);
 
     // 校验点云数量
-    if(out_pclclouds->size() <= 50)
-    {
-        return false;
-    }
+    if(out_pclclouds->size() <= 50) return false;
 
     return true;
 }
