@@ -24,6 +24,7 @@
 #include <pcl/common/transforms.h>
 #include "post_pcl.h"
 
+#define MAX_PLANES 3            // 最多提取3个面
 #define MeanK  40                      // 统计滤波邻域点数，值越大滤波效果越强
 #define StddevMulThresh 1.0f            // 统计滤波阈值，值越大保留点云越多
 #define leaf_size_XY 0.008f             // 体素滤波XY尺寸，值越大点云越稀疏
@@ -53,7 +54,7 @@ public:
         pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
         Plane_Info& plane_info
     );
-
+    
 private:
     // 体素网格降采样
     void voxel_Downsample(
@@ -61,11 +62,10 @@ private:
         pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud
     );
 
-    // 统计滤波去除噪声点
-    void statistical_filter(
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_pclclouds,
-        pcl::PointCloud<pcl::PointXYZ>::Ptr& out_pclclouds
-    );
+    // 欧式聚类提取主点云
+    void euclidean_filter(
+        const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
+        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud);
 
     // RANSAC算法拟合平面
     bool ransac_Plane_Segment(
@@ -78,7 +78,8 @@ private:
     void extract_Plane_Cloud(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
         const pcl::PointIndices::Ptr& plane_inliers,
-        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
+        bool negative = false
     );
 }; // class Ten_pre_pcl
 
@@ -87,15 +88,14 @@ bool Ten_pre_pcl::cloud_filter(
     pcl::PointCloud<pcl::PointXYZ>::Ptr& out_pclclouds
 )
 {
+    if(input_pclclouds->size() <= 50) return false;
+
     // 执行体素降采样
-    voxel_Downsample(input_pclclouds, out_pclclouds);
-
-    // 执行统计滤波
-    statistical_filter(out_pclclouds, out_pclclouds);
-
+    pcl::PointCloud<pcl::PointXYZ>::Ptr mid_pclclouds(new pcl::PointCloud<pcl::PointXYZ>);
+    voxel_Downsample(input_pclclouds, mid_pclclouds);
+    euclidean_filter(mid_pclclouds,out_pclclouds);
     // 校验点云数量
     if(out_pclclouds->size() <= 50) return false;
-
     return true;
 }
 
@@ -104,33 +104,36 @@ void Ten_pre_pcl::voxel_Downsample(
     pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud
 )
 {
-    // 判断点云是否为空
-    if (input_cloud->empty())
-    {
-        return;
-    }
-
     // 初始化并配置体素滤波器
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     vg.setInputCloud(input_cloud);
     vg.setLeafSize(leaf_size_XY, leaf_size_XY, leaf_size_Z);
     vg.filter(*output_cloud);
 }
-
-void Ten_pre_pcl::statistical_filter(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_pclclouds,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr& out_pclclouds
-)
+void Ten_pre_pcl::euclidean_filter(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud)
 {
-    // 初始化并配置统计滤波器
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
-    sor.setInputCloud(input_pclclouds);
-    sor.setMeanK(MeanK);
-    sor.setStddevMulThresh(StddevMulThresh);
-    sor.filter(*out_pclclouds);
+    // 执行欧式聚类
+    std::vector<pcl::PointIndices> cluster_indices;
+    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    ec.setInputCloud(input_cloud);
+    ec.setClusterTolerance(ClusterTolerance);
+    ec.extract(cluster_indices);
+
+    // 提取主聚类点云
+    if (cluster_indices.empty())
+    {
+        *output_cloud = *input_cloud;
+        return;
+    }
+    output_cloud->clear();
+    for (int idx : cluster_indices[0].indices)
+    {
+        output_cloud->push_back(input_cloud->points[idx]);
+    }
 }
 
-// 平面拟合器
 bool Ten_pre_pcl::ransac_Plane_Segment(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
     pcl::PointIndices::Ptr& plane_inliers,
@@ -166,13 +169,15 @@ bool Ten_pre_pcl::ransac_Plane_Segment(
 void Ten_pre_pcl::extract_Plane_Cloud(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
     const pcl::PointIndices::Ptr& plane_inliers,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
+    bool negative
 )
 {
     // 初始化并配置点云提取器
     pcl::ExtractIndices<pcl::PointXYZ> extract;
     extract.setInputCloud(input_cloud);
     extract.setIndices(plane_inliers);
+    extract.setNegative(negative); 
     extract.filter(*output_cloud);
 }
 

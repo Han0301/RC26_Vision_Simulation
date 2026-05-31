@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/Float64.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/statistical_outlier_removal.h>
@@ -119,88 +120,23 @@ public:
         debug_img_pub.publish(msg);
     }
 
-    void set_debug_rgb_image(
-        const cv::Mat& input_image,
-        const Plane_Info& plane_info,
-        const rs2_intrinsics& color_intr, 
-        cv::Mat& output_image
-    )
+    // 通用的数值发布函数
+    void pub_value(
+        const double input_value,
+        const std::string debug_topic_name = "/kfs/debug_value")
     {
-        // 1. 复制原图到输出图像，不修改原始图像
-        output_image = input_image.clone();
-
-        // 安全检查：图像为空
-        if (output_image.empty())
+        static ros::Publisher debug_value_pub;
+        if (!debug_value_pub)
         {
-            return;
+            ros::NodeHandle nh;
+            debug_value_pub = nh.advertise<std_msgs::Float64>(debug_topic_name, 10);
         }
-
-        // 2. 提取 RealSense 相机内参
-        const double fx = color_intr.fx;
-        const double fy = color_intr.fy;
-        const double cx = color_intr.ppx;
-        const double cy = color_intr.ppy;
-
-        // 3. 获取平面3D中心点 & 法向量
-        const Eigen::Vector3d& center_3d = plane_info.plane_center;
-        const Eigen::Vector3d& normal_3d = plane_info.plane_normal;
-
-        // 安全检查：中心点深度必须为正（相机坐标系）
-        if (center_3d.z() < 0.01)
-        {
-            return;
-        }
-
-        // 4. 3D 中心点 投影 → 2D 像素坐标
-        cv::Point2d center_pt;
-        center_pt.x = fx * center_3d.x() / center_3d.z() + cx;
-        center_pt.y = fy * center_3d.y() / center_3d.z() + cy;
-
-        // 安全检查：中心点在图像范围内
-        if (center_pt.x < 0 || center_pt.x >= output_image.cols ||
-            center_pt.y < 0 || center_pt.y >= output_image.rows)
-        {
-            return;
-        }
-
-        // 5. 计算法向量终点（沿法向量方向延伸 0.2 米，可调整长度）
-        const double NORMAL_LENGTH = 0.2;
-        Eigen::Vector3d normal_end_3d = center_3d + normal_3d * NORMAL_LENGTH;
-
-        // 法向量终点投影 → 2D 像素
-        cv::Point2d end_pt;
-        end_pt.x = fx * normal_end_3d.x() / normal_end_3d.z() + cx;
-        end_pt.y = fy * normal_end_3d.y() / normal_end_3d.z() + cy;
-
-        // 6. 绘制可视化元素（红色：中心点+法向量）
-        const cv::Scalar COLOR_RED = cv::Scalar(0, 0, 255);
-        // 绘制平面中心点（实心圆）
-        cv::circle(output_image, center_pt, 8, cv::Scalar(0, 0, 255), -1);
-        cv::putText(output_image, "Plane Center", cv::Point(center_pt.x + 10, center_pt.y), 
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
-
-        char coord_text[100];
-        sprintf(coord_text, "X:%.3f Y:%.3f Z:%.3f", 
-                center_3d.x(), center_3d.y(), center_3d.z());
-        
-        // 绘制在中心点下方，避免重叠
-        cv::putText(output_image, coord_text, cv::Point(center_pt.x + 10, center_pt.y + 20), 
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
-
-        // 绘制法向量线段（穿过中心点）
-        cv::line(output_image, center_pt, end_pt, COLOR_RED, 2);
-        // 标注文字
-        cv::putText(output_image, "Plane Normal", center_pt + cv::Point2d(10, -5),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, COLOR_RED, 1);
+        std_msgs::Float64 mag_value;
+        mag_value.data = input_value;
+        debug_value_pub.publish(mag_value);
     }
 
-    /**
-     * @brief 调试图像：根据中心点+RPY(旋转矩阵) 绘制35cm标准平面正方形（无角点依赖）
-     * @param input_image 输入RGB图像
-     * @param plane_info 包含平面中心、旋转矩阵、RPY的结构体
-     * @param color_intr 彩色相机内参
-     * @param output_image 输出调试图像
-     */
+    // 设置调试图像：35cm标准平面正方形，中心点，法向量
     void set_debug_plane_quadrilateral(
         const cv::Mat& input_image,
         const Plane_Info& plane_info,
@@ -264,26 +200,27 @@ public:
         }
 
         // 绘制方框
-        for (int i = 0; i < pixel_points.size(); i++)
-        {
-            cv::Point p = pixel_points[i];
-            if (p.x < 0 || p.x >= output_image.cols || p.y < 0 || p.y >= output_image.rows)
-                continue;
+        // for (int i = 0; i < pixel_points.size(); i++)
+        // {
+        //     cv::Point p = pixel_points[i];
+        //     if (p.x < 0 || p.x >= output_image.cols || p.y < 0 || p.y >= output_image.rows)
+        //         continue;
 
-            cv::circle(output_image, p, 6, cv::Scalar(255, 0, 0), -1);
-            cv::putText(output_image, std::to_string(i+1), cv::Point(p.x+5, p.y),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
+        //     cv::circle(output_image, p, 6, cv::Scalar(255, 0, 0), -1);
+        //     cv::putText(output_image, std::to_string(i+1), cv::Point(p.x+5, p.y),
+        //                 cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
 
-            int next_idx = (i + 1) % pixel_points.size();
-            cv::Point p_next = pixel_points[next_idx];
-            if (p_next.x >= 0 && p_next.x < output_image.cols && p_next.y >= 0 && p_next.y < output_image.rows)
-            {
-                cv::line(output_image, p, p_next, cv::Scalar(0, 255, 0), 2);
-            }
-        }
+        //     int next_idx = (i + 1) % pixel_points.size();
+        //     cv::Point p_next = pixel_points[next_idx];
+        //     if (p_next.x >= 0 && p_next.x < output_image.cols && p_next.y >= 0 && p_next.y < output_image.rows)
+        //     {
+        //         cv::line(output_image, p, p_next, cv::Scalar(0, 255, 0), 2);
+        //     }
+        // }
 
         // 绘制中心点文字
         Eigen::Vector3d center_3d = plane_info.plane_center;
+        Eigen::Vector3d normal_3d = plane_info.plane_normal; // 提取法向量
         float c_point3d[3] = {(float)center_3d.x(), (float)center_3d.y(), (float)center_3d.z()};
         float c_pixel[2] = {0};
         rs2_project_point_to_pixel(c_pixel, &color_intr, c_point3d);
@@ -302,9 +239,121 @@ public:
             
             cv::putText(output_image, coord_text, cv::Point(u+10, v + 20), 
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 0, 255), 2);
+            
         }
+
+        // ===================== 新增：绘制平面法向量（完全仿照 set_debug_rgb_image） =====================
+        // const double NORMAL_LENGTH = 0.2; // 法向量长度0.2米，可自行调整
+        // const cv::Scalar COLOR_RED = cv::Scalar(0, 0, 255);
+
+        // // 1. 计算法向量终点3D坐标
+        // Eigen::Vector3d normal_end_3d = center_3d + normal_3d * NORMAL_LENGTH;
+
+        // // 2. 投影法向量终点到2D像素
+        // float n_end_point3d[3] = {(float)normal_end_3d.x(), (float)normal_end_3d.y(), (float)normal_end_3d.z()};
+        // float n_end_pixel[2] = {0};
+        // rs2_project_point_to_pixel(n_end_pixel, &color_intr, n_end_point3d);
+        // cv::Point normal_end_p(cvRound(n_end_pixel[0]), cvRound(n_end_pixel[1]));
+
+        // // 3. 安全检查 + 绘制法向量线段与文字
+        // if (center_p.x >= 0 && center_p.x < output_image.cols &&
+        //     center_p.y >= 0 && center_p.y < output_image.rows &&
+        //     normal_end_p.x >= 0 && normal_end_p.x < output_image.cols &&
+        //     normal_end_p.y >= 0 && normal_end_p.y < output_image.rows)
+        // {
+        //     // 绘制法向量线段
+        //     cv::line(output_image, center_p, normal_end_p, COLOR_RED, 2);
+        //     // 标注法向量文字
+        //     cv::putText(output_image, "Plane Normal", cv::Point(center_p.x + 10, center_p.y - 5),
+        //                 cv::FONT_HERSHEY_SIMPLEX, 0.5, COLOR_RED, 1);
+        // }
     }
 
+    void save_bias(double data, const std::string& save_path)
+    {
+        // 以 追加模式 打开文件，不存在则自动创建
+        std::ofstream file(save_path, std::ios::app | std::ios::out);
+        
+        if (!file.is_open())
+        {
+            throw std::runtime_error("无法打开文件：" + save_path);
+        }
+
+        // 写入数据，每行一个，保留6位小数（精度可调）
+        file << std::fixed << std::setprecision(6) << data << std::endl;
+        file.close();
+    }
+
+    std::map<std::string, double> read_bias(const std::string& read_path)
+    {
+        std::map<std::string, double> result;
+        std::vector<double> data_list;
+
+        // 1. 打开并读取文件所有数据
+        std::ifstream file(read_path);
+        if (!file.is_open())
+        {
+            throw std::runtime_error("文件不存在：" + read_path);
+        }
+
+        double val;
+        while (file >> val)
+        {
+            data_list.push_back(val);
+        }
+        file.close();
+
+        // 2. 空数据判断
+        if (data_list.empty())
+        {
+            throw std::runtime_error("文件中无有效数据：" + read_path);
+        }
+
+        size_t n = data_list.size();
+        // 3. 排序（用于分位、最值计算）
+        std::vector<double> sorted_data = data_list;
+        std::sort(sorted_data.begin(), sorted_data.end());
+
+        // 4. 计算 最大值 & 最小值
+        double max_val = sorted_data.back();
+        double min_val = sorted_data[0];
+
+        // 5. 计算 平均值(avg)
+        double sum = 0.0;
+        for (double d : data_list) sum += d;
+        double avg = sum / n;
+
+        // 6. 计算 标准差(standard_bias) → 总体标准差
+        double sum_sq = 0.0;
+        for (double d : data_list)
+        {
+            sum_sq += (d - avg) * (d - avg);
+        }
+        double standard_bias = std::sqrt(sum_sq / n);
+
+        // 7. 计算 90%上分位、10%下分位（线性插值法，工业标准）
+        auto get_percentile = [&](double percent) -> double
+        {
+            double pos = percent * (n - 1);
+            size_t idx = static_cast<size_t>(pos);
+            double frac = pos - idx;
+            if (idx + 1 >= n) return sorted_data.back();
+            return sorted_data[idx] + frac * (sorted_data[idx + 1] - sorted_data[idx]);
+        };
+
+        double percentile_90 = get_percentile(0.9);  // 90%上分位
+        double percentile_10 = get_percentile(0.1);  // 90%下分位
+
+        // 8. 存入字典返回
+        result["max"] = max_val;
+        result["min"] = min_val;
+        result["avg"] = avg;
+        result["standard_bias"] = standard_bias;
+        result["90%bias_max"] = percentile_90;
+        result["90%bias_min"] = percentile_10;
+
+        return result;
+    }
 
 private:
 
@@ -312,25 +361,14 @@ private:
                                     Eigen::Vector3d& x_axis,
                                     Eigen::Vector3d& y_axis)
     {
-        // 法向量归一化
-        Eigen::Vector3d norm_n = n;
-        norm_n.normalize();
-
-        // 计算局部X轴
-        // if (std::fabs(norm_n.z()) < 0.999)
-        // {
-        //     x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
-        // }
-        // else
-        // {
-        //     x_axis = Eigen::Vector3d(0, 1, 0).cross(norm_n).normalized();
-        // }
-
-        x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
-        // 计算局部Y轴
+        Eigen::Vector3d norm_n = n.normalized();
+        // 🔥 固定：永远用世界Z轴构建平面坐标系，绝对不跳变
+        Eigen::Vector3d ref_up = Eigen::Vector3d::UnitZ();
+        // 正交化：平面X轴 = 世界上方向 × 平面法向
+        x_axis = ref_up.cross(norm_n).normalized();
+        // 平面Y轴 = 法向 × X轴（保证右手坐标系，正方形永远在平面内）
         y_axis = norm_n.cross(x_axis).normalized();
     }
-
 };
 
 }       // namespace Plane_FitLocator

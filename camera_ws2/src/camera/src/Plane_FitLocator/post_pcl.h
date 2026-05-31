@@ -20,6 +20,8 @@
 #include "./../method_math.h"
 
 #define BOX_SIZE 0.35
+#define SIZE_MIN_BIAS 0.05   
+#define AREA_MIN_BIAS 0.0375   
 #define RadiusSearch 0.03                // 半径滤波搜索半径，值越小过滤越严格
 #define MinNeighborsInRadius 20          // 半径滤波最小邻域点数，值越大过滤越严格
 #define ClusterTolerance 0.016           // 欧式聚类容差，值越大聚类范围越大
@@ -53,33 +55,31 @@ public:
         Plane_Info& plane_info
     );
 
-    // 组合滤波去除平面噪声
-    void removePlaneNoise(
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
-        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud);
-
     // 转3d点云到2dvector容器
     void set_vector_2d(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
         const Plane_Info& plane_info,
         std::vector<cv::Point2f>& output_2d);
 
-    /**
-     * @brief 带调试打印的2D离群点过滤（可看平均距离，可自定义范围）
-     * @param src 输入原始投影点
-     * @param dst 输出过滤后点
-     * @param threshold 过滤系数（平均距离的倍数，默认1.5）
-     */
-    void central_range_filter(
-        const std::vector<cv::Point2f>& input_points, 
-        std::vector<cv::Point2f>& ouput_points, 
-        float threshold = 1.5);
+    // 形状筛选器
+    bool shape_filter(const std::vector<cv::Point2f>& input_points);
 
     // 优化平面偏航角并更新姿态
     void set_RPY(
         const std::vector<cv::Point2f>& plane_2d_points,
         Plane_Info& plane_info);
 
+    // 2D质心半径过滤
+    void central_range_filter(
+        const std::vector<cv::Point2f>& input_points,
+        std::vector<cv::Point2f>& output_points,
+        float distance_max = 0.25f);
+
+    void vector2f_to_pcl(
+    const std::vector<cv::Point2f>& input_2d,
+    const Plane_Info& plane_info,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud
+    );
 private:
     // 基于法向量构建局部正交坐标轴
     void getLocalAxes(const Eigen::Vector3d& n,
@@ -100,10 +100,6 @@ private:
     // 搜索最优偏航角
     double set_yaw(const std::vector<cv::Point2f>& plane_2d_points);
 
-    // 欧式聚类提取主点云
-    void euclidean_filter(
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
-        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud);
 };      // class Ten_post_pcl
 
 void Ten_post_pcl::compute_CenterAndNormal(
@@ -161,22 +157,12 @@ void Ten_post_pcl::getLocalAxes(const Eigen::Vector3d& n,
                                 Eigen::Vector3d& x_axis,
                                 Eigen::Vector3d& y_axis)
 {
-    // 法向量归一化
-    Eigen::Vector3d norm_n = n;
-    norm_n.normalize();
-
-    // 计算局部X轴
-    // if (std::fabs(norm_n.z()) < 0.999)
-    // {
-    //     x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
-    // }
-    // else
-    // {
-    //     x_axis = Eigen::Vector3d(0, 1, 0).cross(norm_n).normalized();
-    // }
-
-    x_axis = Eigen::Vector3d(1, 0, 0).cross(norm_n).normalized();
-    // 计算局部Y轴
+    Eigen::Vector3d norm_n = n.normalized();
+    // 🔥 固定：永远用世界Z轴构建平面坐标系，绝对不跳变
+    Eigen::Vector3d ref_up = Eigen::Vector3d::UnitZ();
+    // 正交化：平面X轴 = 世界上方向 × 平面法向
+    x_axis = ref_up.cross(norm_n).normalized();
+    // 平面Y轴 = 法向 × X轴（保证右手坐标系，正方形永远在平面内）
     y_axis = norm_n.cross(x_axis).normalized();
 }
 
@@ -240,7 +226,7 @@ double Ten_post_pcl::set_yaw(const std::vector<cv::Point2f>& plane_2d_points)
     int max_score = countInFixedBox(rotatePointCloud2D(plane_2d_points, best_angle));
 
     // 2 粗角度搜索
-    for (double angle = 10.0; angle <= 90.0; angle += 10.0)
+    for (double angle = -90.0; angle <= 90.0; angle += 10.0)
     {
         int score = countInFixedBox(rotatePointCloud2D(plane_2d_points, angle));
         if (score > max_score)
@@ -251,9 +237,9 @@ double Ten_post_pcl::set_yaw(const std::vector<cv::Point2f>& plane_2d_points)
     }
 
     // 3 精角度搜索
-    double start2 = std::max(0.0, best_angle - 3.0);
-    double end2 = std::min(90.0, best_angle + 3.0);
-    for (double angle = start2; angle <= end2; angle += 1.0)
+    double start2 = best_angle - 10.0;
+    double end2 = best_angle + 10.0;
+    for (double angle = start2; angle <= end2; angle += 2.0)
     {
         int score = countInFixedBox(rotatePointCloud2D(plane_2d_points, angle));
         if (score > max_score)
@@ -264,9 +250,9 @@ double Ten_post_pcl::set_yaw(const std::vector<cv::Point2f>& plane_2d_points)
     }
 
     // 4 细角度搜索
-    double start3 = std::max(0.0, best_angle - 0.5);
-    double end3 = std::min(90.0, best_angle + 0.5);
-    for (double angle = start3; angle <= end3; angle += 0.1)
+    double start3 = best_angle - 2;
+    double end3   = best_angle + 2;
+    for (double angle = start3; angle <= end3; angle += 0.2)
     {
         int score = countInFixedBox(rotatePointCloud2D(plane_2d_points, angle));
         if (score > max_score)
@@ -276,95 +262,6 @@ double Ten_post_pcl::set_yaw(const std::vector<cv::Point2f>& plane_2d_points)
         }
     }
     return best_angle;
-}
-
-void Ten_post_pcl::euclidean_filter(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud)
-{
-    // 执行欧式聚类
-    std::vector<pcl::PointIndices> cluster_indices;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setInputCloud(input_cloud);
-    ec.setClusterTolerance(ClusterTolerance);
-    ec.extract(cluster_indices);
-
-    // 提取主聚类点云
-    if (cluster_indices.empty())
-    {
-        *output_cloud = *input_cloud;
-        return;
-    }
-    output_cloud->clear();
-    for (int idx : cluster_indices[0].indices)
-    {
-        output_cloud->push_back(input_cloud->points[idx]);
-    }
-}
-
-void Ten_post_pcl::central_range_filter(
-    const std::vector<cv::Point2f>& input_points, 
-    std::vector<cv::Point2f>& output_points, 
-    float threshold)
-{
-    output_points.clear();
-    // 点太少不过滤，直接返回
-    if (input_points.size() < 10) 
-    { 
-        output_points = input_points; 
-        return; 
-    }
-
-    // 1. 计算点云中心
-    cv::Point2f center(0, 0);
-    for (const auto& p : input_points) center += p;
-    center /= float(input_points.size());
-
-    // 2. 计算每个点到中心的距离
-    std::vector<float> distances;
-    for (const auto& p : input_points)
-    {
-        distances.push_back(cv::norm(p - center));
-    }
-
-    // 3. 计算【平均距离】（核心调试值）
-    float avg_dist = 0.0f;
-    for (float d : distances) avg_dist += d;
-    avg_dist /= distances.size();
-
-    // // ===================== 【关键：打印平均距离 + 过滤范围】 =====================
-    std::cout << "===== 离群点过滤调试信息 =====" << std::endl;
-    // std::cout << "点数量: " << input_points.size() << std::endl;
-    // std::cout << "点云中心: x=" << center.x << ", y=" << center.y << std::endl;
-    std::cout << "平均距离: " << avg_dist << " (像素/单位)" << std::endl;
-    // std::cout << "过滤阈值系数: " << threshold << std::endl;
-    // std::cout << "最大保留距离 = 平均距离 × 系数 = " << avg_dist * threshold << std::endl;
-    // std::cout << "==============================" << std::endl;
-
-    // 4. 过滤：距离 < 平均距离×系数 则保留
-    const float max_dist = avg_dist * threshold;
-    for (size_t i = 0; i < input_points.size(); ++i)
-    {
-        if (distances[i] < max_dist)
-        {
-            output_points.push_back(input_points[i]);
-        }
-    }
-
-    std::cout << "过滤前点数: " << input_points.size() << ", 过滤后点数: " << output_points.size() << std::endl;
-}
-
-void Ten_post_pcl::removePlaneNoise(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud)
-{
-    // 点云空值判断
-    if(input_cloud->empty())
-    {
-        *output_cloud = *input_cloud;
-        return;
-    }
-    euclidean_filter(input_cloud,output_cloud);
 }
 
 void Ten_post_pcl::set_vector_2d(
@@ -388,12 +285,97 @@ void Ten_post_pcl::set_vector_2d(
     for (const auto& p : input_cloud->points)
     {
         const Eigen::Vector3d diff(p.x - origin.x(), p.y - origin.y(), p.z - origin.z());
-        const double x_2d = float(diff.dot(u));
-        const double y_2d = float(diff.dot(v));
+        const float x_2d = float(diff.dot(u));
+        const float y_2d = float(diff.dot(v));
         output_2d.emplace_back(x_2d, y_2d);
     }
 }
 
+bool Ten_post_pcl::shape_filter(const std::vector<cv::Point2f>& input_points)
+{
+    if (input_points.size() < 50) return false;
+
+    const cv::RotatedRect rect = cv::minAreaRect(input_points);
+    const float faceArea = rect.size.width * rect.size.height;
+    if (std::abs(rect.size.width - BOX_SIZE) < SIZE_MIN_BIAS
+        && std::abs(rect.size.height - BOX_SIZE) < SIZE_MIN_BIAS && std::abs(faceArea - BOX_SIZE * BOX_SIZE) < AREA_MIN_BIAS)
+    {
+        return true;
+    }
+    return false;
+}
+
+void Ten_post_pcl::central_range_filter(
+    const std::vector<cv::Point2f>& input_points,
+    std::vector<cv::Point2f>& output_points,
+    float distance_max)
+{
+    // 1. 清空输出
+    output_points.clear();
+
+    // 2. 空值判断
+    if (input_points.empty()) return;
+
+    // 3. 计算2D点质心
+    cv::Point2f centroid(0.0f, 0.0f);
+    for (const auto& pt : input_points)
+    {
+        centroid += pt;
+    }
+    centroid.x /= input_points.size();
+    centroid.y /= input_points.size();
+
+    // 4. 遍历计算距离 + 筛选 + 统计信息
+    float total_dist = 0.0f;
+    float max_dist = 0.0f;
+    std::vector<float> dist_list;
+
+    for (const auto& pt : input_points)
+    {
+        // 计算到质心的欧氏距离
+        float dx = pt.x - centroid.x;
+        float dy = pt.y - centroid.y;
+        float dist = std::sqrt(dx*dx + dy*dy);
+
+        dist_list.push_back(dist);
+        total_dist += dist;
+        if (dist > max_dist) max_dist = dist;
+
+        // 核心：保留范围内的点
+        if (dist <= distance_max)
+        {
+            output_points.push_back(pt);
+        }
+    }
+    // 5. 调试打印（你要的分析信息）
+    float avg_dist = total_dist / input_points.size();
+}
+
+void Ten_post_pcl::vector2f_to_pcl(
+    const std::vector<cv::Point2f>& local_2d_points,
+    const Plane_Info& plane_info,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& world_cloud)
+{
+    world_cloud->clear();
+    world_cloud->reserve(local_2d_points.size());
+
+    // 获取平面局部坐标系轴（和投影时完全一致）
+    Eigen::Vector3d n = plane_info.plane_normal.normalized();
+    Eigen::Vector3d u, v;
+    getLocalAxes(n, u, v);
+    Eigen::Vector3d center = plane_info.plane_center;
+
+    // 逆转换：局部2D(x,y) → 世界3D点 = 质心 + x*u + y*v
+    for (const auto& pt : local_2d_points)
+    {
+        Eigen::Vector3d world_pt = center + pt.x * u + pt.y * v;
+        world_cloud->push_back(pcl::PointXYZ(world_pt.x(), world_pt.y(), world_pt.z()));
+    }
+
+    world_cloud->width = world_cloud->size();
+    world_cloud->height = 1;
+    world_cloud->is_dense = true;
+}
 } // namespace Plane_FitLocator
 } // namespace Ten
 

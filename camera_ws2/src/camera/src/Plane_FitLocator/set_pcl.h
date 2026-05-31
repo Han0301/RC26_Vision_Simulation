@@ -44,7 +44,6 @@ public:
         float x2 = best.cx_ + best.w_ / 2;
         float y1 = best.cy_ - best.h_ / 2;
         float y2 = best.cy_ + best.h_ / 2;
-        
         return cv::Rect(cv::Point2i(cvRound(x1), cvRound(y1)),      // 四舍五入给结果
                         cv::Point2i(cvRound(x2), cvRound(y2)));
     }
