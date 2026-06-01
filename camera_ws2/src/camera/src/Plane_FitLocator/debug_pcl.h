@@ -95,29 +95,47 @@ public:
         tf_broadcaster.sendTransform(tf_msg);
     }
 
-    // 通用的 发布图像话题 函数
-    void pub_debug_image
+    void pub_color_image
     (
-        const cv::Mat& debug_image,
-        const std::string debug_topic_name = "/kfs/debug_image"
+        const cv::Mat& color_image,
+        const std::string topic_name = "/debug_images"
     )
     {
-        static ros::Publisher debug_img_pub;
-        if (!debug_img_pub)
+        static ros::Publisher pub;
+        if (!pub)
         {
             ros::NodeHandle nh;
-            debug_img_pub = nh.advertise<sensor_msgs::Image>(debug_topic_name, 10);
+            pub = nh.advertise<sensor_msgs::Image>(topic_name, 10);
         }
-
-        if (debug_image.empty())return;
+        if (color_image.empty() || color_image.channels() != 3) return;
 
         cv_bridge::CvImage cv_msg;
         cv_msg.header.stamp = ros::Time::now();
-        cv_msg.encoding = sensor_msgs::image_encodings::BGR8;
-        cv_msg.image = debug_image;
+        cv_msg.encoding = sensor_msgs::image_encodings::BGR8; // 固定彩色格式
+        cv_msg.image = color_image;
+        pub.publish(cv_msg.toImageMsg());
+    }
 
-        sensor_msgs::ImagePtr msg = cv_msg.toImageMsg();
-        debug_img_pub.publish(msg);
+    // --------------------- 发布 深度图（16UC1，相机原生） ---------------------
+    void pub_depth_image
+    (
+        const cv::Mat& depth_image,
+        const std::string topic_name = "/depth_show"
+    )
+    {
+        static ros::Publisher pub;
+        if (!pub)
+        {
+            ros::NodeHandle nh;
+            pub = nh.advertise<sensor_msgs::Image>(topic_name, 10);
+        }
+        if (depth_image.empty() || depth_image.type() != CV_16UC1) return;
+
+        cv_bridge::CvImage cv_msg;
+        cv_msg.header.stamp = ros::Time::now();
+        cv_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; // 固定深度格式
+        cv_msg.image = depth_image;
+        pub.publish(cv_msg.toImageMsg());
     }
 
     // 通用的数值发布函数
@@ -361,13 +379,22 @@ private:
                                     Eigen::Vector3d& x_axis,
                                     Eigen::Vector3d& y_axis)
     {
-        Eigen::Vector3d norm_n = n.normalized();
-        // 🔥 固定：永远用世界Z轴构建平面坐标系，绝对不跳变
-        Eigen::Vector3d ref_up = Eigen::Vector3d::UnitZ();
-        // 正交化：平面X轴 = 世界上方向 × 平面法向
-        x_axis = ref_up.cross(norm_n).normalized();
-        // 平面Y轴 = 法向 × X轴（保证右手坐标系，正方形永远在平面内）
-        y_axis = norm_n.cross(x_axis).normalized();
+        Eigen::Vector3d normal = n.normalized();
+        Eigen::Matrix3d R;
+        R.setIdentity();
+
+        if (fabs(normal(2)) < 0.9) {
+            R.col(0) = normal.unitOrthogonal();
+            R.col(1) = normal.cross(R.col(0)).normalized();
+            R.col(2) = normal;
+        } else {
+            R.col(1) = normal.unitOrthogonal();
+            R.col(0) = R.col(1).cross(normal).normalized();
+            R.col(2) = normal;
+        }
+
+        x_axis = R.col(0);
+        y_axis = R.col(1);
     }
 };
 

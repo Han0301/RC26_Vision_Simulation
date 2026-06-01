@@ -25,12 +25,11 @@
 #include "post_pcl.h"
 
 #define MAX_PLANES 3            // 最多提取3个面
-#define MeanK  40                      // 统计滤波邻域点数，值越大滤波效果越强
-#define StddevMulThresh 1.0f            // 统计滤波阈值，值越大保留点云越多
 #define leaf_size_XY 0.008f             // 体素滤波XY尺寸，值越大点云越稀疏
 #define leaf_size_Z  0.008f             // 体素滤波Z尺寸，值越大点云越稀疏
 #define DistanceThreshold 0.02f         // 平面拟合距离阈值，值越大拟合范围越大
 #define MaxIterations 600              // 平面拟合迭代次数，值越大精度越高
+#define ClusterTolerance 0.016           // 欧式聚类容差，值越大聚类范围越大
 
 namespace Ten
 {
@@ -54,7 +53,12 @@ public:
         pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
         Plane_Info& plane_info
     );
-    
+
+    bool Plane_fitter_(
+        const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
+        pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
+        Plane_Info& plane_info);
+
 private:
     // 体素网格降采样
     void voxel_Downsample(
@@ -200,6 +204,61 @@ bool Ten_pre_pcl::Plane_fitter(
 
     // 提取平面点云
     extract_Plane_Cloud(input_cloud, plane_inliers, output_cloud);
+
+    return true;
+}
+
+bool Ten_pre_pcl::Plane_fitter_(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr& output_cloud,
+    Plane_Info& plane_info)
+{
+    if (input_cloud->empty() || input_cloud->size() < 50) return false;
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr remaining(new pcl::PointCloud<pcl::PointXYZ>);
+    *remaining = *input_cloud;
+
+    std::vector<pcl::PointIndices::Ptr> inliers_list;
+    std::vector<Plane_Info> info_list;
+    std::vector<double> score_list;
+    const Eigen::Vector3d CAMERA_Z(0, 0, 1);
+
+    // 循环提取最多3个平面
+    while (inliers_list.size() < MAX_PLANES && remaining->size() > 50)
+    {
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        Plane_Info info;
+
+        // 调用你的原生拟合函数
+        if (!ransac_Plane_Segment(remaining, inliers, info))
+            break;
+
+        // 计算平行度分数
+        double score = fabs(info.plane_normal.dot(CAMERA_Z));
+
+        // 分别存入容器
+        inliers_list.push_back(inliers);
+        info_list.push_back(info);
+        score_list.push_back(score);
+
+        // 剔除当前平面
+        extract_Plane_Cloud(remaining, inliers, remaining, true);
+    }
+
+    if (inliers_list.empty())
+        return false;
+
+    // 找分数最高（最平行）的平面索引
+    int best_idx = 0;
+    for (int i = 1; i < score_list.size(); i++)
+    {
+        if (score_list[i] > score_list[best_idx])
+            best_idx = i;
+    }
+
+    // 输出最优面
+    plane_info = info_list[best_idx];
+    extract_Plane_Cloud(input_cloud, inliers_list[best_idx], output_cloud);
 
     return true;
 }

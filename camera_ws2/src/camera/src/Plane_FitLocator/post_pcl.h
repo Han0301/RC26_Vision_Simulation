@@ -17,14 +17,12 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <Eigen/Dense>
 #include <cmath>
+#include <pcl/registration/icp.h>
 #include "./../method_math.h"
 
 #define BOX_SIZE 0.35
-#define SIZE_MIN_BIAS 0.05   
-#define AREA_MIN_BIAS 0.0375   
-#define RadiusSearch 0.03                // 半径滤波搜索半径，值越小过滤越严格
-#define MinNeighborsInRadius 20          // 半径滤波最小邻域点数，值越大过滤越严格
-#define ClusterTolerance 0.016           // 欧式聚类容差，值越大聚类范围越大
+#define SIZE_MIN_BIAS 0.07   
+#define AREA_MIN_BIAS 0.05 
 
 namespace Ten
 {
@@ -66,7 +64,7 @@ public:
 
     // 优化平面偏航角并更新姿态
     void set_RPY(
-        const std::vector<cv::Point2f>& plane_2d_points,
+        const pcl::PointCloud<pcl::PointXYZ>::Ptr& plane_3d_cloud,
         Plane_Info& plane_info);
 
     // 2D质心半径过滤
@@ -100,6 +98,9 @@ private:
     // 搜索最优偏航角
     double set_yaw(const std::vector<cv::Point2f>& plane_2d_points);
 
+
+    Eigen::Matrix3d last_R_ = Eigen::Matrix3d::Identity();  // 上一帧旋转矩阵
+    bool has_last_ = false;  // 帧标记
 };      // class Ten_post_pcl
 
 void Ten_post_pcl::compute_CenterAndNormal(
@@ -122,50 +123,136 @@ void Ten_post_pcl::compute_CenterAndNormal(
 }
 
 void Ten_post_pcl::set_RPY(
-    const std::vector<cv::Point2f>& plane_2d_points,
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr& plane_3d_cloud,
     Plane_Info& plane_info)
 {
-    // 1 计算最优偏航角
-    double best_yaw_deg = set_yaw(plane_2d_points);
-    double best_yaw_rad = best_yaw_deg * M_PI / 180.0;
+    if (plane_3d_cloud->empty()) return;
 
-    // 2 构建基础旋转矩阵
-    Eigen::Vector3d n = plane_info.plane_normal;
-    n.normalize();
-    Eigen::Vector3d x_axis, y_axis;
-    getLocalAxes(n, x_axis, y_axis);
+    Eigen::Vector3d center = plane_info.plane_center;
+    Eigen::Vector3d n = plane_info.plane_normal.normalized();
+    if (n.z() < 0) n = -n;
 
-    Eigen::Matrix3d rot_mat;
-    rot_mat.col(0) = x_axis;
-    rot_mat.col(1) = y_axis;
-    rot_mat.col(2) = n;
+    std::vector<cv::Point2f> pts_2d;
+    set_vector_2d(plane_3d_cloud, plane_info, pts_2d);
+    if (pts_2d.empty()) return;
 
-    // 3 应用偏航旋转矩阵
-    Eigen::Matrix3d rot_yaw;
-    rot_yaw << cos(best_yaw_rad), -sin(best_yaw_rad), 0,
-               sin(best_yaw_rad),  cos(best_yaw_rad), 0,
-               0,                  0,                 1;
-    rot_mat = rot_yaw * rot_mat;
+    cv::RotatedRect rect = cv::minAreaRect(pts_2d);
+    cv::Point2f verts[4];
+    rect.points(verts);
+    cv::Point2f e1 = verts[1] - verts[0];
+    cv::Point2f e2 = verts[2] - verts[1];
+    cv::Point2f long_dir = (cv::norm(e1) > cv::norm(e2)) ? e1 : e2;
 
-    // 4 计算最终欧拉角
-    plane_info.plane_euler._roll  = std::atan2(rot_mat(2,1), rot_mat(2,2));
-    plane_info.plane_euler._pitch = std::atan2(-rot_mat(2,0), std::hypot(rot_mat(2,1), rot_mat(2,2)));
-    plane_info.plane_euler._yaw   = std::atan2(rot_mat(1,0), rot_mat(0,0));
+    // =========新增：防长短边90°翻转校验=========
+    if(has_last_)
+    {
+        // 当前候选yaw
+        Eigen::Vector3d temp_u, temp_v;
+        getLocalAxes(n, temp_u, temp_v);
+        Eigen::Vector3d tmpX = (long_dir.x * temp_u + long_dir.y * temp_v).normalized();
+        double currYawTmp = std::atan2(tmpX.y(),tmpX.x());
+        double lastYaw = std::atan2(last_R_.col(0).y(),last_R_.col(0).x());
+        double deltaYaw = std::fmod(currYawTmp-lastYaw,2*M_PI);
+        if(deltaYaw>M_PI) deltaYaw -= 2*M_PI;
+        if(deltaYaw<-M_PI) deltaYaw += 2*M_PI;
+        // 差值超45°，判定长短边选反，互换长边短边
+        if(std::fabs(deltaYaw) > M_PI*0.25)
+        {
+            long_dir = (cv::norm(e1) < cv::norm(e2)) ? e1 : e2;
+        }
+    }
+
+    Eigen::Vector3d temp_u, temp_v;
+    getLocalAxes(n, temp_u, temp_v);
+    Eigen::Vector3d target_x = (long_dir.x * temp_u + long_dir.y * temp_v).normalized();
+    Eigen::Vector3d target_y = n.cross(target_x).normalized();
+    Eigen::Matrix3d curr_R;
+    curr_R.col(0) = target_x;
+    curr_R.col(1) = target_y;
+    curr_R.col(2) = n;
+
+    if (has_last_)
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr ref_box(new pcl::PointCloud<pcl::PointXYZ>);
+        float half_box = BOX_SIZE / 2.0f;
+        // =========新增：加密方框采样（边框均匀采点，不再只有4角）=========
+        std::vector<cv::Point2f> box_pts;
+        float step = 0.05f;
+        for(float t=-half_box;t<=half_box;t+=step){box_pts.emplace_back(-half_box,t);}
+        for(float t=-half_box;t<=half_box;t+=step){box_pts.emplace_back( half_box,t);}
+        for(float t=-half_box;t<=half_box;t+=step){box_pts.emplace_back(t,-half_box);}
+        for(float t=-half_box;t<=half_box;t+=step){box_pts.emplace_back(t, half_box);}
+
+        for (auto& p : box_pts) {
+            Eigen::Vector3d wp = center + p.x*last_R_.col(0) + p.y*last_R_.col(1);
+            ref_box->push_back(pcl::PointXYZ(wp.x(), wp.y(), wp.z()));
+        }
+
+        pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+        icp.setInputSource(ref_box);
+        icp.setInputTarget(plane_3d_cloud);
+        icp.setMaxCorrespondenceDistance(0.12);
+        icp.setMaximumIterations(40);
+
+        pcl::PointCloud<pcl::PointXYZ> final_cloud;
+        icp.align(final_cloud);
+
+        if (icp.hasConverged()) {
+            Eigen::Matrix3d icp_R = icp.getFinalTransformation().block<3,3>(0,0).cast<double>();
+            curr_R = icp_R * curr_R;
+        }
+    }
+
+    // 原始单帧角度
+    double r = std::atan2(curr_R(2,1), curr_R(2,2));
+    double p = std::atan2(-curr_R(2,0), std::hypot(curr_R(2,1), curr_R(2,2)));
+    double y = std::atan2(curr_R(1,0), curr_R(0,0));
+
+    // =========新增：低通滤波平滑小幅抖动 alpha=0.3可调，越小越稳=========
+    const double alpha = 0.3;
+    if(!has_last_)
+    {
+        plane_info.plane_euler._roll  = r;
+        plane_info.plane_euler._pitch = p;
+        plane_info.plane_euler._yaw   = y;
+    }
+    else
+    {
+        plane_info.plane_euler._roll  = alpha*r + (1-alpha)*plane_info.plane_euler._roll;
+        plane_info.plane_euler._pitch = alpha*p + (1-alpha)*plane_info.plane_euler._pitch;
+        plane_info.plane_euler._yaw   = alpha*y + (1-alpha)*plane_info.plane_euler._yaw;
+    }
+
+    last_R_.col(0) = Eigen::AngleAxisd(plane_info.plane_euler._yaw,Eigen::Vector3d::UnitZ())
+                   *Eigen::Vector3d::UnitX();
+    last_R_.col(1) = n.cross(last_R_.col(0)).normalized();
+    last_R_.col(2) = n;
+    has_last_ = true;
+
+    std::cout << "✅ ICP稳定Yaw：" << plane_info.plane_euler._yaw * 180/M_PI << "°" << std::endl;
 }
 
 void Ten_post_pcl::getLocalAxes(const Eigen::Vector3d& n,
                                 Eigen::Vector3d& x_axis,
                                 Eigen::Vector3d& y_axis)
 {
-    Eigen::Vector3d norm_n = n.normalized();
-    // 🔥 固定：永远用世界Z轴构建平面坐标系，绝对不跳变
-    Eigen::Vector3d ref_up = Eigen::Vector3d::UnitZ();
-    // 正交化：平面X轴 = 世界上方向 × 平面法向
-    x_axis = ref_up.cross(norm_n).normalized();
-    // 平面Y轴 = 法向 × X轴（保证右手坐标系，正方形永远在平面内）
-    y_axis = norm_n.cross(x_axis).normalized();
-}
+    Eigen::Vector3d normal = n.normalized();
+    Eigen::Matrix3d R;
+    R.setIdentity();
 
+    if (fabs(normal(2)) < 0.9) {
+        R.col(0) = normal.unitOrthogonal();
+        R.col(1) = normal.cross(R.col(0)).normalized();
+        R.col(2) = normal;
+    } else {
+        R.col(1) = normal.unitOrthogonal();
+        R.col(0) = R.col(1).cross(normal).normalized();
+        R.col(2) = normal;
+    }
+
+    x_axis = R.col(0);
+    y_axis = R.col(1);
+}
 void Ten_post_pcl::set_plane_euler(Plane_Info& plane_info)
 {
     // 构建局部坐标轴
@@ -297,6 +384,8 @@ bool Ten_post_pcl::shape_filter(const std::vector<cv::Point2f>& input_points)
 
     const cv::RotatedRect rect = cv::minAreaRect(input_points);
     const float faceArea = rect.size.width * rect.size.height;
+    std::cout << "rect.size.width: " << rect.size.width << ", rect.size.height: " << rect.size.height << std::endl;
+    std::cout << "faceArea: " << std::abs(faceArea - BOX_SIZE * BOX_SIZE) << std::endl;
     if (std::abs(rect.size.width - BOX_SIZE) < SIZE_MIN_BIAS
         && std::abs(rect.size.height - BOX_SIZE) < SIZE_MIN_BIAS && std::abs(faceArea - BOX_SIZE * BOX_SIZE) < AREA_MIN_BIAS)
     {
