@@ -375,27 +375,16 @@ public:
 
 private:
 
-    void getLocalAxes(const Eigen::Vector3d& n,
-                                    Eigen::Vector3d& x_axis,
-                                    Eigen::Vector3d& y_axis)
+    void getLocalAxes(const Eigen::Vector3d& n, Eigen::Vector3d& x, Eigen::Vector3d& y)
     {
         Eigen::Vector3d normal = n.normalized();
-        Eigen::Matrix3d R;
-        R.setIdentity();
+        Eigen::Vector3d aux = Eigen::Vector3d(0,0,1);
+        if(fabs(normal.dot(aux)) > 0.999) aux = Eigen::Vector3d(1,0,0);
 
-        if (fabs(normal(2)) < 0.9) {
-            R.col(0) = normal.unitOrthogonal();
-            R.col(1) = normal.cross(R.col(0)).normalized();
-            R.col(2) = normal;
-        } else {
-            R.col(1) = normal.unitOrthogonal();
-            R.col(0) = R.col(1).cross(normal).normalized();
-            R.col(2) = normal;
-        }
-
-        x_axis = R.col(0);
-        y_axis = R.col(1);
+        x = aux.cross(normal).normalized();
+        y = normal.cross(x).normalized();
     }
+
 };
 
 }       // namespace Plane_FitLocator
