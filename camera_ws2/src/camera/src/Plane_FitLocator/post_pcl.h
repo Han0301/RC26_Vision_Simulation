@@ -67,7 +67,7 @@ public:
     void central_range_filter(
         const std::vector<cv::Point2f>& input_points,
         std::vector<cv::Point2f>& output_points,
-        float distance_max = 0.25f);
+        float distance_max = 0.265f);
 
     void set_yaw(Plane_Info& plane_info, const std::vector<cv::Point2f>& proj_points);
 
@@ -78,6 +78,42 @@ public:
         );
 
     Eigen::Vector3d cal_center_point(const Plane_Info& plane_info);
+
+    // 2D点集边界平滑：邻域均值滤波，消除边界跳动，保留形状
+    void smooth_2d_boundary(std::vector<cv::Point2f>& points, float smooth_radius)
+    {
+        if (points.size() < 20) return;
+
+        std::vector<cv::Point2f> smoothed;
+        smoothed.reserve(points.size());
+        cv::Point2f centroid(0,0);
+
+        // 计算点集质心（用于约束平滑范围，防止形变）
+        for(auto& p : points) centroid += p;
+        centroid.x /= points.size();
+        centroid.y /= points.size();
+
+        // 核心：邻域均值平滑，仅平滑微小抖动，不改变正方形形状
+        for(auto& p : points)
+        {
+            float dx = p.x - centroid.x;
+            float dy = p.y - centroid.y;
+            float dist = hypot(dx, dy);
+
+            // 仅对边界点（远离质心）做小幅平滑，核心点不动
+            if(dist > smooth_radius * 1.5f)
+            {
+                // 向质心方向小幅收敛，消除跳动
+                float ratio = 0.15f; // 平滑强度，越小越稳
+                p.x = p.x * (1-ratio) + centroid.x * ratio;
+                p.y = p.y * (1-ratio) + centroid.y * ratio;
+            }
+            smoothed.push_back(p);
+        }
+
+        points.swap(smoothed);
+    }
+
 private:
     // 基于法向量构建局部正交坐标轴
     void getLocalAxes(const Eigen::Vector3d& n,
@@ -135,7 +171,6 @@ void Ten_post_pcl::set_plane_euler(Plane_Info& plane_info)
     plane_info.plane_euler._yaw   = 0.0;
 }
 
-// 唯一正确的set_yaw：矩阵级绕法向量旋转，无畸变、轴全对
 void Ten_post_pcl::set_yaw(Plane_Info& plane_info, const std::vector<cv::Point2f>& proj_points)
 {
     if (proj_points.empty())
@@ -144,7 +179,7 @@ void Ten_post_pcl::set_yaw(Plane_Info& plane_info, const std::vector<cv::Point2f
         return;
     }
 
-    // 1. 计算矩形角度（不变）
+    // 1. 计算矩形角度
     std::vector<cv::Point2f> hull;
     cv::convexHull(proj_points, hull);
     cv::RotatedRect rect = cv::minAreaRect(hull);
@@ -153,7 +188,6 @@ void Ten_post_pcl::set_yaw(Plane_Info& plane_info, const std::vector<cv::Point2f
     if(sz.width > sz.height) ang += 90.f;
     double yaw_angle = ang * CV_PI / 180.0;
 
-    // ===================== 核心修复：矩阵旋转，不直接改yaw =====================
     // 2. 重建基础旋转矩阵（Z轴=法向量，绝对垂直）
     Eigen::Vector3d n = plane_info.plane_normal;
     Eigen::Vector3d x_axis, y_axis;
@@ -163,17 +197,16 @@ void Ten_post_pcl::set_yaw(Plane_Info& plane_info, const std::vector<cv::Point2f
     rot.col(1) = y_axis;
     rot.col(2) = n;
 
-    // 3. 绕【法向量Z轴】旋转（唯一不会畸变的方式）
+    // 3. 绕【法向量Z轴】旋转
     Eigen::Matrix3d yaw_rot;
-    yaw_rot = Eigen::AngleAxisd(yaw_angle, n);  // 绕法向量旋转！
+    yaw_rot = Eigen::AngleAxisd(yaw_angle, n);  // 绕法向量旋转
     rot = yaw_rot * rot;
 
-    // 4. 重新计算正确RPY（矩阵→欧拉角，无偏差）
+    // 4. 重新计算正确RPY
     plane_info.plane_euler._roll = std::atan2(rot(2,1), rot(2,2));
     plane_info.plane_euler._pitch = std::atan2(-rot(2,0), std::hypot(rot(2,1), rot(2,2)));
     plane_info.plane_euler._yaw = std::atan2(rot(1,0), rot(0,0));
 }
-
 
 void Ten_post_pcl::set_vector_2d(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud,

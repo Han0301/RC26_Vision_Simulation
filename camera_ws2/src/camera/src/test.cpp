@@ -121,7 +121,7 @@ void set_key(Ten::Plane_FitLocator::Ten_debug_pcl& debug_pcl, bool &save_enabled
 void test1_frombag()
 {
     ros::NodeHandle nh;
-    std::string bag_path = "/home/h/2026-06-01-11-05-56.bag";
+    std::string bag_path = "/home/h/angle.bag";
     if (!init_bag_player(bag_path)) return;
 
     // 参数
@@ -134,12 +134,22 @@ void test1_frombag()
         // 设置输入图像
         Ten::camera_frame frame = get_next_frame_from_bag();
         bool is_ok = plane_fiter.process(frame);
-        std::cout << "state: " << plane_fiter.get_state() << std::endl;
         if (is_ok)
         {
+            // 以D435相机光轴(Z轴)为基准平面，平面内X轴为基准直线
+            const Eigen::Vector3d target_plane(0.0, 0.0, 1.0);
+            const Eigen::Vector3d line_point(0.0, 0.0, 0.0);
+            const Eigen::Vector3d line_dir(1.0, 0.0, 0.0);
+
+            // 计算偏差指标
+            Ten::Plane_FitLocator::result res = plane_fiter.set_result(
+                target_plane, line_point, line_dir);
+            double angle = res.deviation_angle;
+            std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
+            std::cout << "res.bias: " <<  res.bias << std::endl;
+            std::cout << "res.distance: " <<  res.distance << std::endl;
             plane_fiter.publish(frame);
         }
-
         ros::spinOnce();
         loop_rate.sleep();
     }
@@ -159,6 +169,7 @@ void test1_fromframe()
         // 设置输入图像
         Ten::camera_frame frame = _CAMERA_.camera_read_depth();
         bool is_ok = plane_fiter.process(frame);
+        Ten::Plane_FitLocator::Plane_Info plane = plane_fiter.get_plane_info();
         if (is_ok)
         {
             plane_fiter.publish(frame);
@@ -212,9 +223,10 @@ void test2()
     cv::destroyAllWindows();
 
 }
+
 int main(int argc, char** argv)
 {
-    // 初始化ROS节点
+    // 初始化ROS节点--------------------------------------------------------------
     ros::init(argc, argv, "test_node");
     
     test1_frombag();

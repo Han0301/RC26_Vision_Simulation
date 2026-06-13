@@ -19,7 +19,7 @@ class Ten_set_pcl
 public:
 
     Ten_set_pcl()
-        :detector("/home/h/下载/卷轴检测_han2/best","cpu",0,0.5,0.5)
+        :detector("/home/h/下载/卷轴检测red/best","cpu",0,0.5,0.5)
     {}
 
     // 设置yolo 目标检测的矩形框
@@ -29,6 +29,7 @@ public:
         std::vector<Ten::Detection> results = detector.worker(const_cast<cv::Mat&>(image));
         if(results.empty()) return cv::Rect();
 
+        std::cout << "results.size(): " << results.size() << std::endl;
         // 2 取最优结果
         std::sort(results.begin(), results.end(),
                     [](const Ten::Detection &det1, const Ten::Detection &det2) -> bool
