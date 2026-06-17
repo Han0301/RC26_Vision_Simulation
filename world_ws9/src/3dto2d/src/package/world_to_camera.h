@@ -77,11 +77,11 @@ namespace Ten
                 obj.y = current->points[i].y;
                 obj.z = current->points[i].z;
                 object_3d_points.push_back(obj);
-                if (i >= 96 && i < 96 + 8)
-                {
-                    std::cout<< "current->points[i]" << current->points[i] << std::endl;
-                    std::cout<< "camera->points[i]" << camera->points[i] << std::endl;
-                }
+                // if (i >= 96 && i < 96 + 8)
+                // {
+                //     std::cout<< "current->points[i]" << current->points[i] << std::endl;
+                //     std::cout<< "camera->points[i]" << camera->points[i] << std::endl;
+                // }
             }
             // std::cout<< "camerainfo_.revc()" << camerainfo_.revc() << std::endl;
             // std::cout<< "camerainfo_.tevc()" << camerainfo_.tevc() << std::endl;

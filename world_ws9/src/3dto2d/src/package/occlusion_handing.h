@@ -29,25 +29,6 @@
 #include <stdexcept> // 用于异常处理
 namespace Ten{
 
-float generateRandomFloat(float min_val, float max_val) {
-    // 检查参数合法性：下限必须小于上限
-    if (min_val >= max_val) {
-        throw std::invalid_argument("错误：随机数下限必须小于上限！");
-    }
-
-    // 1. 静态随机数引擎：仅初始化一次，避免重复序列（关键！）
-    // std::random_device 用于获取真随机种子（不同平台兼容性好）
-    static std::random_device rd;
-    // Mersenne Twister引擎：高性能、高随机性的伪随机数生成器
-    static std::mt19937 gen(rd());
-
-    // 2. 浮点数均匀分布：生成 [min_val, max_val] 区间的float
-    std::uniform_real_distribution<float> dist(min_val, max_val);
-
-    // 3. 生成并返回随机数
-    return dist(gen);
-}
-
 #define L_ 1.2f                 // 台阶长度
 #define H_ 0.2f                 // 台阶高度
 #define lx1_ 0.425f             // 台阶到方块的间距
@@ -64,6 +45,7 @@ float generateRandomFloat(float min_val, float max_val) {
 #define offset_x_ 0.00          // x方向上的偏移量
 #define offset_y_ 0.00            // y方向上的偏移量
 #define offset_z_ 0.00             // z方向上的偏移量
+
 struct box{
     int idx;                             // 表示位置的下标索引
     cv::Mat roi_image;                   // 裁剪出来的roi图片
@@ -204,12 +186,16 @@ public:
      * @param C_object_plum_points 相机坐标系下，方块和台阶的3D点
      * @param object_plum_2d_points  像素坐标系下，方块和台阶的2d点
      * @param box_lists 方块的列表
+     * @param debug_mode 是否启用调试模式， 默认是false
+     * @param scale 缩放比例
      */
     void set_box_lists_(
-        const cv::Mat& image,     
+        const cv::Mat& input_image,     
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
-        std::vector<box>& box_lists);
+        std::vector<box>& box_lists,
+        bool debug_mode = false,
+        float scale = 0.65f);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -374,22 +360,61 @@ private:
     {
         bool update_image = true;
         if (valid_max_points.empty() || valid_max_points.size() <= 800) {
-            std::cout << "🤡in func: set_box_lists_ 4.2, box idx= " <<  i / 3 + 1 <<  ", valid_max_points is empty or size() = " <<  valid_max_points.size()<< " < 600, skip crop ROI" << std::endl;
-            // box_lists[i].zbuffer_flag = -1; // 标记异常
             update_image = false;
         }
         else if (interested_boxes[i / 3] == 0)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,!(exist_boxes[i] != 0 && interested_boxes[i] == 1), skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         }
         else if (box_lists[i / 3].zbuffer_flag == -1)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,box_lists[i].zbuffer_flag == -1, skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         } 
         return update_image;
     }
+
+
+// 安全生成掩码（功能、逻辑、输出完全和之前一致）
+cv::Mat createSurfaceMask(const surface_2d_point& surf, const cv::Size& img_size) {
+    cv::Mat mask = cv::Mat::zeros(img_size, CV_8UC1);
+    if (img_size.width <= 0 || img_size.height <= 0) {
+        return mask;
+    }
+
+    const int cols = img_size.width;
+    const int rows = img_size.height;
+
+    auto clampPoint = [&](float x, float y) -> cv::Point {
+        int cx = cvRound(x);
+        int cy = cvRound(y);
+        cx = std::max(0, std::min(cx, cols - 1));
+        cy = std::max(0, std::min(cy, rows - 1));
+        return cv::Point(cx, cy);
+    };
+
+    std::vector<cv::Point> contour = {
+        clampPoint(surf.left_up.x,    surf.left_up.y),
+        clampPoint(surf.right_up.x,   surf.right_up.y),
+        clampPoint(surf.right_down.x, surf.right_down.y),
+        clampPoint(surf.left_down.x,  surf.left_down.y)
+    };
+
+    if (contour.size() >= 3) {
+        bool valid = false;
+        for (size_t i = 1; i < contour.size(); i++) {
+            if (contour[i] != contour[0]) {
+                valid = true;
+                break;
+            }
+        }
+        if (valid) {
+            std::vector<std::vector<cv::Point>> contours = {contour};
+            cv::fillPoly(mask, contours, cv::Scalar(255));
+        }
+    }
+    return mask;
+}
+
 };
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
     extern Ten::init_3d_box _INIT_3D_BOX_;

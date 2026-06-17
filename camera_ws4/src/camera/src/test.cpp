@@ -94,7 +94,7 @@ bool makeDir(const std::string& path)
     return mkdir(path.c_str(), 0777) == 0 || errno == EEXIST;
 }
 
-// 保存当前帧图像 + ROI归一化坐标TXT
+// 保存数据集
 void saveFrameAndRoi(const cv::Mat& bgr_img, const cv::Rect& roi, int count)
 {
     if (bgr_img.empty() || roi.area() <= 0)
@@ -134,32 +134,34 @@ void saveFrameAndRoi(const cv::Mat& bgr_img, const cv::Rect& roi, int count)
     std::cout << "✅ 保存成功：" << img_name << " | " << txt_name << std::endl;
 }
 
+// 发布深度图和彩色图像
 void save_native_frames(
-    ros::Publisher& color_pub,
-    ros::Publisher& depth_pub,
     const Ten::camera_frame& frame
 )
 {
+    static ros::Publisher color_pub;
+    static ros::Publisher depth_pub;
+    ros::Time stamp = ros::Time::now();
+
     // 直接判断 cv::Mat 是否为空
     if (frame.bgr_image.empty() || frame.depth_image.empty())
     {
         std::cout << "[ERROR] 帧数据为空" << std::endl;
         return;
     }
-    ros::Time stamp = ros::Time::now();
 
-    // 发布彩色图（不变）
+    // 发布彩色图
     cv_bridge::CvImage color_msg;
     color_msg.header.stamp = stamp;
     color_msg.encoding = sensor_msgs::image_encodings::BGR8;
     color_msg.image = frame.bgr_image.clone();
     color_pub.publish(color_msg.toImageMsg());
 
-    // 发布深度图 → 直接用 frame.depth_image（cv::Mat），无 memcpy
+    // 发布深度图
     cv_bridge::CvImage depth_msg;
     depth_msg.header.stamp = stamp;
     depth_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-    depth_msg.image = frame.depth_image.clone(); // 直接赋值
+    depth_msg.image = frame.depth_image.clone(); 
     depth_pub.publish(depth_msg.toImageMsg());
 }
 
@@ -195,7 +197,7 @@ static void mouse_callback_lab(int event, int x, int y, int flags, void* userdat
         int L = lab_value[0];
         int a = lab_value[1];
         int b = lab_value[2];
-        global_lab_text = cv::format("Click Lab -> L:%d, a:%d, b:%d", L, a, b);
+        global_lab_text = cv::format("Click Lab -> H:%d, s:%d, v:%d", L, a, b);
     }
 }
 
@@ -206,7 +208,7 @@ void show_lab_value_on_click(cv::Mat& bgr_image)
         return;
 
     // BGR转Lab色彩空间
-    cv::cvtColor(bgr_image, global_lab_image, cv::COLOR_BGR2Lab);
+    cv::cvtColor(bgr_image, global_lab_image, cv::COLOR_BGR2HSV);
     cv::Mat display_image = bgr_image.clone();
 
     // 初始化窗口与鼠标回调（仅执行一次）
@@ -297,13 +299,12 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "test_node");
     ros::NodeHandle nh;
-    ros::Publisher color_image_pub = nh.advertise<sensor_msgs::Image>("/camera/color/image_raw", 30);
-    ros::Publisher depth_image_pub = nh.advertise<sensor_msgs::Image>("/camera/depth/image_raw", 30);
 
-    // Ten::Ten_camera& _CAMERA_ = Ten::Ten_camera::GetInstance();
-    // _CAMERA_.reset_camera_depth(640, 480, 30);
-    // rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();
-    rs2_intrinsics color_intr = createManualIntrinsics();
+    // 获取数据的方式， 填充内参的方式
+    Ten::Ten_camera& _CAMERA_ = Ten::Ten_camera::GetInstance();
+    _CAMERA_.reset_camera_depth(640, 480, 30);
+    rs2_intrinsics color_intr = _CAMERA_.get_color_intrinsics();
+    // rs2_intrinsics color_intr = createManualIntrinsics();
     
     Ten::KFS::kfsLocator pnp_hander(color_intr);
 
@@ -322,8 +323,8 @@ int main(int argc, char** argv)
     while (ros::ok())
     {
         // 读取frame的方式
-        Ten::camera_frame frame = get_next_frame_from_bag();
-        // Ten::camera_frame frame = _CAMERA_.camera_read_depth();
+        // Ten::camera_frame frame = get_next_frame_from_bag();
+        Ten::camera_frame frame = _CAMERA_.camera_read_depth();
 
         pnp_hander.processOneFrame(frame.bgr_image, frame.depth_image,true);
 
@@ -336,7 +337,8 @@ int main(int argc, char** argv)
         //     g_save_count++;
         //     g_save_flag = false; // 重置标志
         // }
-        // save_native_frames(color_image_pub, depth_image_pub, frame);
+        // save_native_frames(frame);
+
         ros::spinOnce();
         loop_rate.sleep();
     }

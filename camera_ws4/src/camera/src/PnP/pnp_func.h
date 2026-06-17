@@ -113,12 +113,12 @@ public:
       return out;
     }
 
-    // // 提取红色目标ROI区域
+    // 提取红色目标ROI区域
     out.roi = getRedRoi(colorBgr, out.kfs_Mask);
 
     // out.roi = test_yolo2(colorBgr);
 
-    // // 判断ROI是否有效
+    // 判断ROI是否有效
     if (out.roi.area() <= 0)
     {
       out.status = "no red roi";
@@ -135,7 +135,7 @@ public:
       return out;
     }
 
-    // set_Pcl_Cloud(depth_frame,color_intr,out.cloudRaw);
+    // set_Pcl_Cloud(depth_frame,color_intr_,out.cloudRaw);
     std::cout << "out.cloudRaw.size(): " << out.cloudRaw->size() << std::endl;
 
     // 点云预处理（降采样 + 欧式聚类）
@@ -249,6 +249,87 @@ private:
       float y2 = best.cy_ + best.h_ / 2;
 
       return cv::Rect(cv::Point2i(x1, y1), cv::Point2i(x2, y2));
+  }
+
+  cv::Rect getRedRoi_(const cv::Mat& src, cv::Mat& outMask) const
+  {
+      // ====================== 修改部分：替换为HSV颜色空间 ======================
+      cv::Mat hsv;
+      // BGR转HSV（OpenCV默认图像格式为BGR，必须用这个转换）
+      cv::cvtColor(src, hsv, cv::COLOR_BGR2HSV);
+
+      // 红色在HSV中分为两个区间，定义通用红色阈值（适配绝大多数场景）
+      cv::Scalar lower_red1 = cv::Scalar(0, 120, 70);    // 红色下段 H:0-10
+      cv::Scalar upper_red1 = cv::Scalar(10, 255, 255);
+      cv::Scalar lower_red2 = cv::Scalar(160, 120, 70);  // 红色上段 H:160-179
+      cv::Scalar upper_red2 = cv::Scalar(179, 255, 255);
+
+      cv::Scalar lower_blue = cv::Scalar(80, 150, 50);  // 红色上段 H:160-179
+      cv::Scalar upper_blue = cv::Scalar(120, 255, 255);
+      // 生成两个红色掩码
+      cv::Mat mask1, mask2;
+      cv::inRange(hsv, lower_red1, upper_red1, mask1);
+      cv::inRange(hsv, lower_red2, upper_red2, mask2);
+
+      cv::Mat mask;
+      cv::inRange(hsv,lower_blue,upper_blue,mask);
+      // 合并两个掩码，得到最终红色区域掩码
+      cv::bitwise_or(mask1, mask2, outMask);
+      // ======================================================================
+
+      // 创建形态学卷积核（保留你原代码不变）
+      cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+
+      // 开运算去除噪点（保留原代码）
+      cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+
+      // 闭运算填充空洞（保留原代码）
+      cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+
+      // 提取图像轮廓（保留原代码）
+      std::vector<std::vector<cv::Point>> contours;
+      cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+      // 判断轮廓是否为空（保留原代码）
+      if (contours.empty())
+      {
+          return cv::Rect();
+      }
+
+      // 计算图像最大允许面积（保留原代码）
+      const double imageArea = static_cast<double>(src.cols * src.rows);
+      const double maxAllowedArea = cfg_.roiMaxAreaRatio * imageArea;
+
+      // 遍历轮廓筛选最优目标（保留原代码）
+      double bestArea = 0.0;
+      int bestIdx = -1;
+      for (size_t i = 0; i < contours.size(); ++i)
+      {
+          const double area = cv::contourArea(contours[i]);
+          if (area < cfg_.roiMinArea || area > maxAllowedArea)
+          {
+              continue;
+          }
+          if (area > bestArea)
+          {
+              bestArea = area;
+              bestIdx = static_cast<int>(i);
+          }
+      }
+
+      // 判断是否找到有效轮廓（保留原代码）
+      if (bestIdx < 0)
+      {
+          return cv::Rect();
+      }
+
+      // 计算最优轮廓外接矩形并扩展（保留原代码）
+      cv::Rect rect = cv::boundingRect(contours[static_cast<size_t>(bestIdx)]);
+      rect.x = std::max(0, rect.x);
+      rect.y = std::max(0, rect.y);
+      rect.width = std::min(src.cols - rect.x, rect.width);
+      rect.height = std::min(src.rows - rect.y, rect.height);
+      return rect;
   }
 
 

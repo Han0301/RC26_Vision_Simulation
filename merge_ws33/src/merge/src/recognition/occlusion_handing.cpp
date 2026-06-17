@@ -7,7 +7,8 @@ void Ten_occlusion_handing::set_box_lists_(
     const cv::Mat& image,     
     const std::vector<cv::Point3f>& C_object_plum_points,
     const std::vector<cv::Point2f>& object_plum_2d_points,
-    std::vector<box>& box_lists)
+    std::vector<box>& box_lists,
+    bool debug_mode)
 {
     // 1. 取到 exist_boxes_ 和 interested_boxes_
     int exist_boxes[12];
@@ -20,6 +21,24 @@ void Ten_occlusion_handing::set_box_lists_(
             interested_boxes[i] = interested_boxes_[i];
         }
     }
+    // 调试打印部分
+    if (debug_mode)
+    {
+        std::cout << "__________________in func : set_box_lists_____________" << std::endl;
+        std::cout << "     exist_boxes: ";
+        for (int i = 0; i< 12; i++)
+        {
+            std::cout << exist_boxes[i] << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "interested_boxes: ";
+        for (int i = 0; i< 12; i++)
+        {
+            std::cout << interested_boxes[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+
     // 2. 根据深度信息 更新2d点列表
     std::vector<surface_2d_point> object_2d;
     std::vector<surface_2d_point> plum_2d;      // 通过下标来访问， 【0】表示 正面或后面， 【1】表示 左侧面或右侧面， 【2】表示 上面或地面
@@ -115,8 +134,6 @@ void Ten_occlusion_handing::set_box_lists_(
             }   
         } 
 
-
-
         // 4 填充好单个方块的zbuffer深度信息后， 开始裁剪图像信息
         // 4.1 在当前方块范围内，找到 有效的，面积最大的（认为在方块几个面中最优）的 点集 valid_max_points
         int max_points_count = INT_MIN;
@@ -142,6 +159,10 @@ void Ten_occlusion_handing::set_box_lists_(
         }
         ///---------------------------------------------------------4.2 不更新 roi_image 的条件 -------------------------------
         bool is_update_img = is_update_image(box_lists,valid_max_points,interested_boxes,i);
+        if (debug_mode)
+        {
+            std::cout << "place: " << i / 3 + 1 << ", valid_max_points.size(): " << valid_max_points.size() << ", is_update_img: " << is_update_img << std::endl;
+        }
         if (!(is_update_img)) continue;
         
         // 4.3 准备有效区域的掩码, 并更新有效区域的外接x_min,y_min,x_max,y_max
@@ -196,8 +217,6 @@ void Ten_occlusion_handing::set_box_lists_(
         box_lists[i / 3].zbuffer_flag = 1;
         box_lists[i / 3].roi_valid_flag = 1;
     }
-
-
 }
 
 
@@ -214,7 +233,6 @@ cv::Mat Ten_occlusion_handing::update_debug_image(
     image.copyTo(img);
 
     for (size_t i = 0; i < object_plum_2d_points_.size(); i++) {
-        
         if (i < 96){
         cv::circle(img, object_plum_2d_points_[i],3, cv::Scalar(0,255,0), -1);
     }   
@@ -230,8 +248,9 @@ void Ten_occlusion_handing::set_debug_roi_image(
     const int COL_NUM = 4;          // 每行列数
     const int ROW_NUM = 3;          // 总行数
     const int TOTAL_IMGS = 12;      // 总图片数（1-12）
-    // 2. 初始化12个160×160的全黑图
+    // 2. 初始化12个160×160的全黑图以及拼接图
     std::vector<cv::Mat> roi_images(TOTAL_IMGS, cv::Mat::zeros(SINGLE_SIZE, SINGLE_SIZE, CV_8UC3));
+    debug_best_roi_image = cv::Mat::zeros(480, 640, CV_8UC3);
 
     // 3. 填充有效ROI图（idx1-12）
     for (int idx = 1; idx <= TOTAL_IMGS; ++idx) {

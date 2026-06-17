@@ -1,19 +1,19 @@
+#ifndef __SET_RESULT_H_
+#define __SET_RESULT_H_
 #include "set_plane.h"
 #include "set_detect.h"
-#include "set_plane.h"
 #include "debug_pcl.h"
 #include "../camera.h"
 
-namespace Ten
-{
-namespace kfs_locator
-{
 
+namespace Ten::kfs_locator
+{
 struct result
 {
-    double deviation_angle = 0.0;     // 目标面的法向量到预设面的法向量的角度
-    double bias = 0.0;                // 体中心点到预设面上预设直线的投影偏差距离
-    double distance = 0.0;            // 体中心点到预设面的距离
+    double bia_radian = 0.0;     // 目标面的法向量到预设面的法向量的角度
+    double x = 0.0;         
+    double y = 0.0;           
+    double z = 0.0; 
 };
 
 
@@ -23,9 +23,7 @@ public:
     Ten_set_result(rs2_intrinsics color_intr)
     :   input_cloud(new pcl::PointCloud<pcl::PointXYZ>),
         filter_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-        plane_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-        plane_cloud_fited(new pcl::PointCloud<pcl::PointXYZ>),
-        plane_cloud_vec(new pcl::PointCloud<pcl::PointXYZ>)
+        plane_cloud(new pcl::PointCloud<pcl::PointXYZ>)
     {
         color_intr_ = color_intr;
         depth_show = cv::Mat();
@@ -42,16 +40,7 @@ public:
     bool postprocess(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud_ptr = nullptr);
 
     // 4 设置结果
-    /**
-     * @brief 设置结果（确保key_center已被设置）
-     * @param target_plane 预设平面方程
-     * @param line_point   预设直线上一点
-     * @param line_dir     预设直线方程
-    */
-    result set_result(
-        const Eigen::Vector3d& target_plane,        
-        const Eigen::Vector3d& line_point, 
-        const Eigen::Vector3d& line_dir);
+    result set_result();
     // 执行流程 ---------------------------------------------------------------
 
     // 调试： 发布调试图像和tf， 点云
@@ -89,10 +78,6 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud;
     pcl::PointCloud<pcl::PointXYZ>::Ptr filter_cloud;
     pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_fited; 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_vec; 
-    std::vector<cv::Point2f> plane_points_2d;
-    std::vector<cv::Point2f> plane_points_flited;
     Eigen::Vector3d key_center;     // 体中心点
     // 调试相关
     cv::Mat depth_show;
@@ -119,6 +104,7 @@ inline bool Ten_set_result::preprocess(Ten::camera_frame& frame)
         state = "set_pcl_clouds error!";
         return false;
     }
+    state = "preprocess ok";
     return true;
 }
 
@@ -162,17 +148,6 @@ inline bool Ten_set_result::postprocess(const pcl::PointCloud<pcl::PointXYZ>::Pt
 
     // 方形拟合
     SET_PLANE_.compute_Center(plane_cloud,plane_info);
-    SET_PLANE_.set_vector_2d(plane_cloud,plane_info,plane_points_2d);
-    SET_PLANE_.central_range_filter(plane_points_2d,plane_points_flited);
-    bool is_shape_ok = SET_PLANE_.shape_filter(plane_points_flited);
-    if (!is_shape_ok)
-    {
-        state = "shape_filter error!";
-        return false;
-    }
-    SET_PLANE_.set_yaw(plane_info, plane_points_flited);
-    SET_PLANE_.vector2f_to_pcl(plane_points_flited,plane_info,plane_cloud_vec);
-    SET_PLANE_.compute_Center(plane_cloud_vec,plane_info,false);
     // 赋值体中心点
     key_center = SET_PLANE_.cal_center_point(plane_info);
     state = "ok";
@@ -181,16 +156,10 @@ inline bool Ten_set_result::postprocess(const pcl::PointCloud<pcl::PointXYZ>::Pt
 
 inline void Ten_set_result::publish(Ten::camera_frame& frame)
 {
-    if (state == "ok")
-    {
         cv::normalize(frame.depth_image, depth_show, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-        DEBUG_PCL_.set_debug_plane_quadrilateral(frame.bgr_image,plane_info, color_intr_,debug_image);
         DEBUG_PCL_.pub_depth_image(frame.depth_image, "depth_show");
         DEBUG_PCL_.pub_color_image(frame.bgr_image, "bgr_image");
-        DEBUG_PCL_.pub_color_image(debug_image, "debug_image");
-        DEBUG_PCL_.publish_PlaneTF(plane_info);
-        DEBUG_PCL_.publish_pointcloud(plane_cloud_vec);
-    }
+        DEBUG_PCL_.publish_pointcloud(plane_cloud);
 }
 
 inline double Ten_set_result::calc_deviation_angle(const Eigen::Vector3d& target_plane)
@@ -205,7 +174,6 @@ inline double Ten_set_result::calc_deviation_angle(const Eigen::Vector3d& target
 
     // 原始夹角（弧度，范围 0 ~ M_PI）
     double rad_angle = std::acos(dot_product);
-
     // 1. 取最小夹角，约束到 0 ~ M_PI/2（对应 0° ~ 90°）
     rad_angle = std::min(rad_angle, M_PI - rad_angle);
 
@@ -218,28 +186,25 @@ inline double Ten_set_result::calc_deviation_angle(const Eigen::Vector3d& target
     return rad_angle;
 }
 
-inline result Ten_set_result::set_result(
-        const Eigen::Vector3d& target_plane,        
-        const Eigen::Vector3d& line_point, 
-        const Eigen::Vector3d& line_dir)
-    {
-        result out;
-        Eigen::Vector3d target_plane_normal = target_plane.normalized();
-        Eigen::Vector3d target_line_dir = line_dir.normalized();
-        // 点垂直投影到目标平面
-        Eigen::Vector3d proj_center = key_center - target_plane_normal.dot(key_center) * target_plane_normal;
+inline result Ten_set_result::set_result()
+{
+    result out;
+    const Eigen::Vector3d target_plane(0.0, 0.0, 1.0);
+    const Eigen::Vector3d line_point(0.0, 0.0, 0.0);
+    const Eigen::Vector3d line_dir(1.0, 0.0, 0.0);
 
-        // 计算投影点到目标直线的距离
-        Eigen::Vector3d vec = proj_center - line_point;
-        out.bias = vec.cross(target_line_dir).norm();
+    // 点垂直投影到目标平面
+    Eigen::Vector3d proj_center = key_center - target_plane.dot(key_center) * target_plane;
 
-        // 点到目标平面的垂直距离
-        double plane_dist = (key_center - line_point).dot(target_plane_normal);
-        out.distance = std::fabs(plane_dist);
+    // 计算投影点到目标直线的距离
+    Eigen::Vector3d vec = proj_center - line_point;
+    out.x = vec.x();
+    out.y = vec.y();
+    out.z = key_center.z();
+    out.bia_radian = calc_deviation_angle(target_plane);
+    return out;
+}
 
-        out.deviation_angle = calc_deviation_angle(target_plane);
-        return out;
-    }
+} // namespace Ten::kfs_locator
 
-}       // namespace kfs_locator
-}       // namespace Ten
+#endif

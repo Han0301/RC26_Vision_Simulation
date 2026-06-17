@@ -190,7 +190,7 @@ target_sources(test_node
   PRIVATE
   src/camera.cpp
   src/method_math.cpp
-  src/openvino.cpp
+  src/yolo/yolo_base.cpp
 )
 
 

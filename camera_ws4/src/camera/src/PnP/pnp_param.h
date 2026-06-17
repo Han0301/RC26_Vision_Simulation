@@ -46,8 +46,9 @@ struct kfsPnpConfig
     int labAMin = 120;                        // LAB颜色A通道最小值
     int labAMax = 180;                        // LAB颜色A通道最大值
     int labBMin = 50;                          // LAB颜色B通道最小值
-    int labBMax = 120;                        // LAB颜色B通道最大值
+    int labBMax = 140;                        // LAB颜色B通道最大值
   };
+  
   kfsPnpConfig::red red;
   kfsPnpConfig::blue blue;
 
@@ -60,8 +61,8 @@ struct kfsPnpConfig
 
   float size_min_bias = 0.06;
 
-  double ransacDist = 0.012;                 // RANSAC平面距离阈值，调整平面拟合精度
-  int ransacIter = 500;                     // RANSAC迭代次数，值越高拟合越准
+  double ransacDist = 0.015;                 // RANSAC平面距离阈值，调整平面拟合精度
+  int ransacIter = 600;                     // RANSAC迭代次数，值越高拟合越准
   int minPlanePoints = 50;                  // 最小平面点数，过滤小平面
   double minSecondPlaneRatio = 0.3;         // 第二平面比例，保证辅助平面有效性
   double duplicateNormalDot = 0.8;          // 法向量重复阈值，过滤相似平面

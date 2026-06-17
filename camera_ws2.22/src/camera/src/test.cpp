@@ -1,7 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
-#include <stdexcept>
 #include <ros/ros.h>
 #include "camera.h"
 
@@ -132,30 +131,31 @@ void test1_frombag()
     ros::Rate loop_rate(30);
     while (ros::ok())
     {
-        // 设置输入图像
+        // // 设置输入图像
         Ten::camera_frame frame = get_next_frame_from_bag();
+
+        auto start = std::chrono::high_resolution_clock::now();
         bool is_pre_ok = plane_fiter.preprocess(frame);
-
-        if (is_pre_ok)
-        {
-            bool is_post_ok = plane_fiter.postprocess();
-            std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
-            plane_fiter.publish(frame);
-            if (is_post_ok)
-            {
-                // 以D435相机光轴(Z轴)为基准平面，平面内X轴为基准直线
-                const Eigen::Vector3d target_plane(0.0, 0.0, 1.0);
-                const Eigen::Vector3d line_point(0.0, 0.0, 0.0);
-                const Eigen::Vector3d line_dir(1.0, 0.0, 0.0);
-
-                // 计算偏差指标
-                Ten::kfs_locator::result res = plane_fiter.set_result(target_plane, line_point, line_dir);
-                double angle = res.deviation_angle;
-                std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
-                std::cout << "res.bias: " <<  res.bias << std::endl;
-                std::cout << "res.distance: " <<  res.distance << std::endl;
-            }
-        }
+        std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
+        std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
+        plane_fiter.publish(frame);
+        auto end = std::chrono::high_resolution_clock::now(); 
+        double cost_ms = std::chrono::duration<double, std::milli>(end - start).count();
+        std::cout << "preprocess count: " << cost_ms << std::endl;
+        // if (is_pre_ok)
+        // {
+        //     bool is_post_ok = plane_fiter.postprocess();
+        //     if (is_post_ok)
+        //     {
+        //         // 计算偏差指标
+        //         Ten::kfs_locator::result res = plane_fiter.set_result();
+        //         double angle = res.bia_radian;
+        //         std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
+        //         std::cout << "res.x: " <<  res.x << std::endl;
+        //         std::cout << "res.y: " <<  res.y << std::endl;
+        //         std::cout << "res.z: " <<  res.z << std::endl;
+        //     }
+        // }
 
         ros::spinOnce();
         loop_rate.sleep();
@@ -175,6 +175,7 @@ void test1_fromframe()
     {
         // 设置输入图像
         Ten::camera_frame frame = _CAMERA_.camera_read_depth();
+        plane_fiter.publish(frame);
         bool is_pre_ok = plane_fiter.preprocess(frame);
         if (is_pre_ok)
         {
@@ -182,7 +183,7 @@ void test1_fromframe()
 
             if (is_post_ok)
             {
-                plane_fiter.publish(frame);
+
             }
         }
     }
@@ -224,8 +225,6 @@ void test2()
         // 设置输入图像
         Ten::camera_frame frame = _CAMERA_.camera_read_depth();
         plane_fiter.preprocess(frame);
-        debug_pcl.set_debug_plane_quadrilateral(frame.bgr_image, plane_fiter.get_plane_info(), color_intr,debug_image);
-        cv::imshow("debug_view", debug_image);
         set_bias(plane_fiter,debug_pcl,save_path,save_enabled);
 
         ros::spinOnce();
@@ -241,6 +240,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "test_node");
     
     test1_frombag();
+    
     delete g_view;
     g_bag.close();
     return 0;

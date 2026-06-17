@@ -5,7 +5,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
-#include "../openvino.h"
+#include "../yolo/yolo_v5.h"
 
 #define CloudDepth_min 200
 #define CloudDepth_max 1800
@@ -26,19 +26,19 @@ public:
     cv::Rect set_roi_detect(const cv::Mat &image)
     {
         // 1 调用worker函数
-        std::vector<Ten::Detection> results = detector.worker(const_cast<cv::Mat&>(image));
+        std::vector<Ten::yolo::Detection> results = detector.worker(const_cast<cv::Mat&>(image));
         if(results.empty()) return cv::Rect();
 
         std::cout << "results.size(): " << results.size() << std::endl;
         // 2 取最优结果
         std::sort(results.begin(), results.end(),
-                    [](const Ten::Detection &det1, const Ten::Detection &det2) -> bool
+                    [](const Ten::yolo::Detection &det1, const Ten::yolo::Detection &det2) -> bool
                     {
                         double s1 = det1.w_ * det1.h_;
                         double s2 = det2.w_ * det2.h_;
                         return s1 > s2;
                     });
-        Ten::Detection best = results[0];       // 检测框中心点坐标和宽高
+        Ten::yolo::Detection best = results[0];       // 检测框中心点坐标和宽高
 
         // 3 计算框边界坐标
         float x1 = best.cx_ - best.w_ / 2;
@@ -96,7 +96,7 @@ public:
 
 
 private:
-    Ten::Ten_yolo detector;
+    Ten::yolo::yolo_v5 detector;
 
 };      // class Ten_set_pcl
 }       // namespace Plane_FitLocator

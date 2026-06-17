@@ -179,12 +179,14 @@ public:
      * @param C_object_plum_points 相机坐标系下，方块和台阶的3D点
      * @param object_plum_2d_points  像素坐标系下，方块和台阶的2d点
      * @param box_lists 方块的列表
+     * @param debug_mode 是否调试的标志, 默认为false
      */
     void set_box_lists_(
         const cv::Mat& image,     
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
-        std::vector<box>& box_lists);
+        std::vector<box>& box_lists,
+        bool debug_mode = false);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -348,18 +350,14 @@ private:
     {
         bool update_image = true;
         if (valid_max_points.empty() || valid_max_points.size() <= 800) {
-            std::cout << "🤡in func: set_box_lists_ 4.2, box idx= " <<  i / 3 + 1 <<  ", valid_max_points is empty or size() = " <<  valid_max_points.size()<< " < 600, skip crop ROI" << std::endl;
-            // box_lists[i].zbuffer_flag = -1; // 标记异常
             update_image = false;
         }
         else if (interested_boxes[i / 3] == 0)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,!(exist_boxes[i] != 0 && interested_boxes[i] == 1), skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         }
         else if (box_lists[i / 3].zbuffer_flag == -1)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,box_lists[i].zbuffer_flag == -1, skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         } 
         return update_image;

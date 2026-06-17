@@ -45,7 +45,7 @@ namespace Ten
                 std::vector<Detection> result;
                 const float* data = output.data<const float>();
                 auto shape = output.get_shape();
-               
+
                 const int num_detections = shape[1];  
                 const int features_per_box = shape[2];
                 const int num_classes = shape[2] - 5;

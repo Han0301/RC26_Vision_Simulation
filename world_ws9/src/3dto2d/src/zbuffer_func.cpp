@@ -60,6 +60,8 @@ struct G
 
     image_transport::Publisher zbuffer_pub;
 
+    int time_count = 0;
+    std::chrono::microseconds time_total;
 
     nav_msgs::Odometry::ConstPtr robot_pose;  // 缓存位姿数据
     bool pose_updated = false;              // 位姿更新标记
@@ -82,12 +84,12 @@ void zbuffer_process()
         tf._xyz._z = tf._xyz._z - 0.05;
     }
 
-    std::cout << "tf.x: " << tf._xyz._x  << std::endl;
-    std::cout << "tf.y: " << tf._xyz._y  << std::endl;
-    std::cout << "tf.z: " << tf._xyz._z  << std::endl;
-    std::cout << "tf.roll: " << tf._rpy._roll  << std::endl;
-    std::cout << "tf.pitch: " << tf._rpy._pitch  << std::endl;
-    std::cout << "tf.yaw: " << tf._rpy._yaw  << std::endl;
+    // std::cout << "tf.x: " << tf._xyz._x  << std::endl;
+    // std::cout << "tf.y: " << tf._xyz._y  << std::endl;
+    // std::cout << "tf.z: " << tf._xyz._z  << std::endl;
+    // std::cout << "tf.roll: " << tf._rpy._roll  << std::endl;
+    // std::cout << "tf.pitch: " << tf._rpy._pitch  << std::endl;
+    // std::cout << "tf.yaw: " << tf._rpy._yaw  << std::endl;
 
     // 雷达到相机的固定变换
     Ten::XYZRPY wt;
@@ -106,15 +108,15 @@ void zbuffer_process()
     Ten::_CAMERA_TRANSFORMATION_.set_worldtolidar(tf);
 
     Ten::Ten_camerainfo cccc;
-    for(int i = 0; i < 8; i++)
-    {
-        std::cout << Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].x << " "<<Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].y <<" "<< Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].z << std::endl;
-    }
+    // for(int i = 0; i < 8; i++)
+    // {
+    //     std::cout << Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].x << " "<<Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].y <<" "<< Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].z << std::endl;
+    // }
     Eigen::Matrix4d world_to_camera = Ten::_CAMERA_TRANSFORMATION_.pcl_transform_world_to_camera(Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_, 
             Ten::_INIT_3D_BOX_.pcl_C_plum_object_points_, Ten::_INIT_3D_BOX_.object_plum_2d_points_);
     cccc.set_Extrinsic_Matrix(world_to_camera);
-    std::cout <<  "cccc.rvec() : "<< cccc.rvec()  << std::endl;
-    std::cout << "cccc.tvec() : "<<cccc.tvec()  << std::endl;
+    // std::cout <<  "cccc.rvec() : "<< cccc.rvec()  << std::endl;
+    // std::cout << "cccc.tvec() : "<<cccc.tvec()  << std::endl;
 
     Ten::_INIT_3D_BOX_.pcl_to_C();
 
@@ -123,8 +125,19 @@ void zbuffer_process()
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
+
+    auto start = std::chrono::high_resolution_clock::now();
     Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
     Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    global.time_total += duration;
+    global.time_count += 1;
+    if (global.time_count % 10 == 0)
+    {
+        std::cout << "run set_box_lists for 10 time_count: " << global.time_total.count()  / 1000.0 << " ms" << std::endl;
+        global.time_total = std::chrono::microseconds(0);
+    }
 
     global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
         global._image,

@@ -1,11 +1,9 @@
 #ifndef __SET_DETECT_H_
 #define __SET_DETECT_H_
-#include <ros/ros.h>
-#include <iostream>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
-#include "../openvino.h"
+#include "../yolo/yolo_v5.h"
 
 namespace Ten
 {
@@ -20,19 +18,19 @@ class Ten_set_detect
 public:
 
     Ten_set_detect()
-        :detector("/home/h/下载/卷轴检测red/best","cpu",0,0.5,0.5)
+        :detector("/home/h/下载/卷轴检测red/best","cpu",0.75,0.75,0.75)
     {}
 
     // 设置yolo 目标检测的矩形框
-    std::vector<cv::Rect> set_roi_detect(const cv::Mat &image)
+    std::vector<cv::Rect> set_roi_detect(cv::Mat &image)
     {
         // 1 调用worker函数
-        std::vector<Ten::Detection> results = detector.worker(const_cast<cv::Mat&>(image));
+        std::vector<Ten::yolo::Detection> results = detector.worker(image);
         if(results.empty()) return {};
 
         // 2 取最优结果
         std::sort(results.begin(), results.end(),
-                    [](const Ten::Detection &det1, const Ten::Detection &det2) -> bool
+                    [](const Ten::yolo::Detection &det1, const Ten::yolo::Detection &det2) -> bool
                     {
                         double s1 = det1.w_ * det1.h_;
                         double s2 = det2.w_ * det2.h_;
@@ -117,7 +115,7 @@ public:
     }
 
 private:
-    Ten::Ten_yolo detector;
+    Ten::yolo::yolo_v5 detector;
 
 };      // class Ten_set_detect
 }       // namespace kfs_locator
