@@ -758,7 +758,7 @@ void vision_test_input_lidar()
     urcu_memb_register_thread();
     Ten::superstratum::super sp_controller;
     Ten::lidar::lidar_recogniton lidar_r;
-    Ten::superstratum::supper2 supper2_;
+    Ten::superstratum::supper2 supper2_(true);
     Ten::superstratum::super_post super_post_;
 
     int input = 0;
