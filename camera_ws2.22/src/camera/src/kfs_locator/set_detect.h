@@ -76,33 +76,39 @@ public:
         if (rois.empty()) return false;
         pcl_clouds.clear();
 
+        // 预提取内参，避免循环内重复访问
+        const float fx = color_intr.fx;
+        const float fy = color_intr.fy;
+        const float ppx = color_intr.ppx;
+        const float ppy = color_intr.ppy;
+        const float inv_fx = 1.0f / fx;
+        const float inv_fy = 1.0f / fy;
+
         for (const cv::Rect& roi : rois)
         {
             // 单个ROI越界校验，非法区域直接跳过
             if (roi.x < 0 || roi.y < 0 || roi.x + roi.width  > depth_frame.cols || roi.y + roi.height > depth_frame.rows) continue;
             pcl::PointCloud<pcl::PointXYZ>::Ptr single_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-            // // 遍历当前ROI内所有像素
-            int y_end = roi.y + roi.height;
-            int x_end = roi.x + roi.width;
-            for (int v = roi.y; v < y_end; v++) 
-            {
-                for (int u = roi.x; u < x_end; u++) 
-                {
-                    uint16_t z_mm = depth_frame.ptr<uint16_t>(v)[u];
+            const int y_end = roi.y + roi.height;
+            const int x_end = roi.x + roi.width;
+            // 预分配容量，避免多次 realloc
+            single_cloud->reserve(static_cast<size_t>(roi.width) * roi.height);
 
+            for (int v = roi.y; v < y_end; v++)
+            {
+                const uint16_t* row_ptr = depth_frame.ptr<uint16_t>(v);
+                for (int u = roi.x; u < x_end; u++)
+                {
+                    uint16_t z_mm = row_ptr[u];
                     if (z_mm < CloudDepth_min || z_mm > CloudDepth_max) continue;
                     float z = z_mm * 0.001f;
 
-                    // 反投影
-                    float pixel[2] = {(float)u, (float)v};
-                    float point3d[3] = {0};
-                    rs2_deproject_pixel_to_point(point3d, &color_intr, pixel, z);
-                    
+                    // 手动反投影：比 rs2_deproject_pixel_to_point 快数倍
                     pcl::PointXYZ p;
-                    p.x = point3d[0];
-                    p.y = point3d[1];
-                    p.z = point3d[2];
+                    p.x = (u - ppx) * inv_fx * z;
+                    p.y = (v - ppy) * inv_fy * z;
+                    p.z = z;
                     single_cloud->push_back(p);
                 }
             }
@@ -111,7 +117,7 @@ public:
                 pcl_clouds.push_back(single_cloud);
             }
         }
-        return true;
+        return !pcl_clouds.empty();
     }
 
 private:

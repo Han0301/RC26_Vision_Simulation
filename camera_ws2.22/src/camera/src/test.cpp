@@ -134,28 +134,24 @@ void test1_frombag()
         // // 设置输入图像
         Ten::camera_frame frame = get_next_frame_from_bag();
 
-        auto start = std::chrono::high_resolution_clock::now();
         bool is_pre_ok = plane_fiter.preprocess(frame);
         std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
-        std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
         plane_fiter.publish(frame);
-        auto end = std::chrono::high_resolution_clock::now(); 
-        double cost_ms = std::chrono::duration<double, std::milli>(end - start).count();
-        std::cout << "preprocess count: " << cost_ms << std::endl;
-        // if (is_pre_ok)
-        // {
-        //     bool is_post_ok = plane_fiter.postprocess();
-        //     if (is_post_ok)
-        //     {
-        //         // 计算偏差指标
-        //         Ten::kfs_locator::result res = plane_fiter.set_result();
-        //         double angle = res.bia_radian;
-        //         std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
-        //         std::cout << "res.x: " <<  res.x << std::endl;
-        //         std::cout << "res.y: " <<  res.y << std::endl;
-        //         std::cout << "res.z: " <<  res.z << std::endl;
-        //     }
-        // }
+
+        if (is_pre_ok)
+        {
+            bool is_post_ok = plane_fiter.postprocess();
+            if (is_post_ok)
+            {
+                // 计算偏差指标
+                Ten::kfs_locator::result res = plane_fiter.set_result();
+                double angle = res.bia_radian;
+                std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
+                std::cout << "res.x: " <<  res.x << std::endl;
+                std::cout << "res.y: " <<  res.y << std::endl;
+                std::cout << "res.z: " <<  res.z << std::endl;
+            }
+        }
 
         ros::spinOnce();
         loop_rate.sleep();

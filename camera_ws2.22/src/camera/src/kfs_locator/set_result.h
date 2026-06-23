@@ -191,7 +191,6 @@ inline result Ten_set_result::set_result()
     result out;
     const Eigen::Vector3d target_plane(0.0, 0.0, 1.0);
     const Eigen::Vector3d line_point(0.0, 0.0, 0.0);
-    const Eigen::Vector3d line_dir(1.0, 0.0, 0.0);
 
     // 点垂直投影到目标平面
     Eigen::Vector3d proj_center = key_center - target_plane.dot(key_center) * target_plane;

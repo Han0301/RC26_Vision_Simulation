@@ -21,6 +21,7 @@ namespace Ten::kfs_locator {
     constexpr float DistanceThreshold = 0.016f;          // 平面拟合距离阈值，值越大拟合范围越大
     constexpr int  MaxIterations = 1000;                 // 平面拟合迭代次数，值越大精度越高
     constexpr float ClusterTolerance = 0.012;            // 欧式聚类容差，值越大聚类范围越大
+    constexpr int   MinPlaneInliers = 100;               // RANSAC 平面拟合最小内点数，低于此值视为无效
 
 
     // 存储平面位姿信息
@@ -56,8 +57,7 @@ namespace Ten::kfs_locator {
         // 计算平面点云质心与初始姿态
         void compute_Center(
             pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-            Plane_Info& plane_info,
-            bool is_first = true
+            Plane_Info& plane_info
         );
 
         Eigen::Vector3d cal_center_point(const Plane_Info& plane_info);
@@ -165,6 +165,12 @@ namespace Ten::kfs_locator {
         // 计算并赋值平面法向量
         if(!plane_inliers->indices.empty())
         {
+            // 校验内点数量，避免少量噪点被误认为平面
+            if (plane_inliers->indices.size() < static_cast<size_t>(MinPlaneInliers))
+            {
+                plane_inliers->indices.clear();
+                return false;
+            }
             float a = coeffs->values[0];
             float b = coeffs->values[1];
             float c = coeffs->values[2];
@@ -216,8 +222,7 @@ namespace Ten::kfs_locator {
 
     inline void Ten_set_plane::compute_Center(
         pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud,
-        Plane_Info& plane_info,
-        bool is_first)
+        Plane_Info& plane_info)
     {
         // 计算点云质心
         Eigen::Vector4f centroid_float;

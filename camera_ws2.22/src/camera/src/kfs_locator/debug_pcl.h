@@ -67,7 +67,7 @@ public:
         pub.publish(cv_msg.toImageMsg());
     }
 
-    // --------------------- 发布 深度图（16UC1，相机原生） ---------------------
+    // --------------------- 发布深度图（自动识别 CV_16UC1 或 CV_8UC1） ---------------------
     void pub_depth_image
     (
         const cv::Mat& depth_image,
@@ -80,11 +80,15 @@ public:
             ros::NodeHandle nh;
             pub = nh.advertise<sensor_msgs::Image>(topic_name, 10);
         }
-        if (depth_image.empty() || depth_image.type() != CV_16UC1) return;
+        if (depth_image.empty()) return;
+
+        const int img_type = depth_image.type();
+        if (img_type != CV_16UC1 && img_type != CV_8UC1) return;
 
         cv_bridge::CvImage cv_msg;
         cv_msg.header.stamp = ros::Time::now();
-        cv_msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; // 固定深度格式
+        cv_msg.encoding = (img_type == CV_16UC1) ? sensor_msgs::image_encodings::TYPE_16UC1
+                                                  : sensor_msgs::image_encodings::MONO8;
         cv_msg.image = depth_image;
         pub.publish(cv_msg.toImageMsg());
     }
