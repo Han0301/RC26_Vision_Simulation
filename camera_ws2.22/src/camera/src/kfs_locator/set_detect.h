@@ -18,7 +18,7 @@ class Ten_set_detect
 public:
 
     Ten_set_detect()
-        :detector("/home/h/下载/卷轴检测red/best","cpu",0.75,0.75,0.75)
+        :detector("/home/h/下载/卷轴检测blue/best","cpu",0.75,0.75,0.75)
     {}
 
     // 设置yolo 目标检测的矩形框

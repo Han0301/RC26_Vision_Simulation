@@ -59,11 +59,6 @@ public:
     {
         return state;
     }
-    // 写接口
-    void set_input_cloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cl)
-    {
-        input_cloud = input_cl;
-    }
 
 private:
     // 参数
@@ -110,6 +105,7 @@ inline bool Ten_set_result::preprocess(Ten::camera_frame& frame)
 
 inline bool Ten_set_result::postprocess(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud_ptr)
 {
+    // 选择输入点云
     if (input_cloud_ptr)
     {
         input_cloud = input_cloud_ptr;

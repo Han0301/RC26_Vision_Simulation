@@ -171,17 +171,30 @@ void test1_fromframe()
     {
         // 设置输入图像
         Ten::camera_frame frame = _CAMERA_.camera_read_depth();
-        plane_fiter.publish(frame);
+        // 处理流程
         bool is_pre_ok = plane_fiter.preprocess(frame);
+        std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
         if (is_pre_ok)
         {
-            bool is_post_ok = plane_fiter.postprocess();
-
+            // 设置输入点云列表
+            std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> input_clouds = plane_fiter.get_input_clouds();
+            std::cout << "input_clouds size: " << input_clouds.size() << std::endl;
+            // 将输出点云直接给postprocess函数
+            bool is_post_ok = plane_fiter.postprocess();        // 置空输入点云，使用点云列表中的第一个点云
+            std::cout << "state: " <<  plane_fiter.get_state() << std::endl;
             if (is_post_ok)
             {
-
+                Ten::kfs_locator::result res = plane_fiter.set_result();
+                double angle = res.bia_radian;
+                std::cout << "angle: " <<  (angle * 180.0 / M_PI) << std::endl;
+                std::cout << "res.x: " <<  res.x << std::endl;
+                std::cout << "res.y: " <<  res.y << std::endl;
+                std::cout << "res.z: " <<  res.z << std::endl;
             }
         }
+        // 调试发布
+        plane_fiter.publish(frame);
+        ros::spinOnce();
     }
 }
 
@@ -235,7 +248,7 @@ int main(int argc, char** argv)
     // 初始化ROS节点--------------------------------------------------------------
     ros::init(argc, argv, "test_node");
     
-    test1_frombag();
+    test1_fromframe();
     
     delete g_view;
     g_bag.close();
