@@ -1,0 +1,63 @@
+2026-05-30 19:30:14,113 - MainThread - INFO - <module>:2587 - Starting application
+2026-05-30 19:30:14,184 - MainThread - INFO - __init__:1581 - Initializing ScriptRunnerApp
+2026-05-30 19:30:14,215 - MainThread - DEBUG - wrapper:46 - Entering create_welcome_tab
+2026-05-30 19:30:14,281 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:14,296 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:14,297 - MainThread - DEBUG - wrapper:49 - Exiting create_welcome_tab successfully
+2026-05-30 19:30:14,297 - MainThread - DEBUG - wrapper:46 - Entering load_scripts
+2026-05-30 19:30:14,416 - MainThread - DEBUG - wrapper:49 - Exiting load_scripts successfully
+2026-05-30 19:30:14,424 - MainThread - INFO - show_debug_info:1619 - 
+调试模式已启用
+日志文件: /home/maple/study3/robocon_ws18/src/merge/shell_monitor/logs/debug_20260530_193014.log
+Python版本: 3.8.10 (default, Mar 18 2025, 20:04:55) 
+[GCC 9.4.0]
+平台: Linux-5.15.0-139-generic-x86_64-with-glibc2.29
+进程ID: 21708
+线程: MainThread
+
+2026-05-30 19:30:14,452 - MainThread - INFO - <module>:2603 - Starting main loop
+2026-05-30 19:30:15,297 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:15,315 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:16,315 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:16,332 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:17,332 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:17,350 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:18,351 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:18,370 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:19,371 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:19,389 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:20,389 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:20,407 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:21,407 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:21,426 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:22,427 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:22,446 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:23,447 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:23,466 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:24,467 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:24,485 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:25,486 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:25,503 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:26,503 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:26,519 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:27,520 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:27,536 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:28,536 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:28,554 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:29,555 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:29,574 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:30,574 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:30,592 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:31,592 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:31,611 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:32,611 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:32,628 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:33,629 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:33,649 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:34,649 - MainThread - DEBUG - wrapper:46 - Entering update_resource_info
+2026-05-30 19:30:34,665 - MainThread - DEBUG - wrapper:49 - Exiting update_resource_info successfully
+2026-05-30 19:30:45,640 - MainThread - INFO - <module>:2606 - Received keyboard interrupt
+2026-05-30 19:30:45,640 - MainThread - DEBUG - wrapper:46 - Entering cleanup_and_exit
+2026-05-30 19:30:45,640 - MainThread - INFO - cleanup_and_exit:1639 - Starting cleanup and exit
+2026-05-30 19:30:45,640 - MainThread - INFO - cleanup_and_exit:1644 - Destroying main window
+2026-05-30 19:30:45,670 - MainThread - INFO - cleanup_and_exit:1646 - Exiting application
