@@ -438,11 +438,12 @@ void test_camerahhh()
 
 void test_camera_detR1()
 {
-    std::vector<int> idxs = {Ten::_usb_device_num2_};
-    Ten::Ten_usb_cam_multi& usbcam = Ten::Ten_usb_cam_multi::GetInstance(idxs,640,480,60);
-    usbcam.set_idx(Ten::_usb_device_num1_);
-    std::cout << "is_r1: " << Ten::apriltag_detect::is_r1(usbcam) << std::endl;
     Ten::Ten_camera& deppcamera = Ten::Ten_camera::GetInstance();
     deppcamera.reset_camera(640,480,60);
-    std::cout << "is_r1: " << Ten::apriltag_detect::is_r1(deppcamera) << std::endl;
+    std::cout << "is_r1: " << Ten::apriltag_detect::is_r1_area(deppcamera) << std::endl;
+    std::vector<int> idxs = {Ten::_usb_device_num2_};
+    Ten::Ten_usb_cam_multi& usbcam = Ten::Ten_usb_cam_multi::GetInstance(idxs,640,480,60);
+    usbcam.set_idx(Ten::_usb_device_num2_);
+    std::cout << "is_r1: " << Ten::apriltag_detect::is_r1_area(usbcam) << std::endl;
+
 }

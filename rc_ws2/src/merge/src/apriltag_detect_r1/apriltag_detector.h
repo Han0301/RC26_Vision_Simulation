@@ -38,7 +38,6 @@ private:
     int is_r1 = -1;      // 初始状态
 
     bool detect(cv::Mat& image);
-    const std::string& state() const { return state_; }
 };
 
 // 构造实现
@@ -155,7 +154,7 @@ inline void AprilTagDetector::detR1(Ten::camera_virtual& camera)
     is_r1 = -1;
     int isnt_frame = 0;
 
-    while (ros::ok() && Ten::_TREADPOOL_FLAG_.read_flag())
+    while (Ten::_TREADPOOL_FLAG_.read_flag())
     {
         cv::Mat frame = camera.camera_read();
         if (frame.empty())
@@ -164,7 +163,11 @@ inline void AprilTagDetector::detR1(Ten::camera_virtual& camera)
             std::cout << "frame.empty()" << std::endl;
             continue;
         }
-        if (isnt_frame > 90) return;
+        if (isnt_frame > 90) 
+        {
+            is_r1 = 0;
+            break;
+        }
 
         bool is_apriltag = detect(frame);
 
@@ -175,9 +178,9 @@ inline void AprilTagDetector::detR1(Ten::camera_virtual& camera)
         frame_count += 1;
 
         // 置 is_r1
-        if (frame_count > 30)
+        if (frame_count > 10)
         {
-            if (frame_ok > 6)
+            if (frame_ok > 3)
             {
                 is_r1 = 1;
             }
@@ -187,6 +190,9 @@ inline void AprilTagDetector::detR1(Ten::camera_virtual& camera)
             }
             break;
         }
+        std::cout << "frame_ok: " <<frame_ok << std::endl;
+        cv::imshow("AprilTag Detection", frame);
+        cv::waitKey(1);
     }
 }
 }  // namespace Ten::apriltag_detect

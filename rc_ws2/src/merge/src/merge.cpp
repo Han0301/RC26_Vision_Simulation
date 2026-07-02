@@ -121,54 +121,10 @@ void sigintHandler(int sig)
 #else
     int main(int argc, char **argv)
     {
-        // if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug)) {
-        //     ros::console::notifyLoggerLevelsChanged();
-        // }
-
-        //ros::init(argc, argv, "merge_node");
-        //关键：NoSigintHandler → 禁用ROS默认的SIGINT处理，改用自定义逻辑
-        
-        ros::init(argc, argv, "merge_node", ros::init_options::NoSigintHandler);
-
-
-
-        // ========== 第二步：创建NodeHandle（必须！否则ros::ok()无效） ==========
-        ros::NodeHandle nh;
-        //3. 注册自定义SIGINT信号处理函数（替换默认处理）
-        signal(SIGINT, sigintHandler);
-
         std::cout << "🐅: " << "R0" << std::endl;
-        //Ten::parameter::loadyaml ly;
         Ten::parameter::loadyaml::loadyamlall();
-        Ten::_PUB_CLOUD_FLAG_.set_flag(false);
-        
-        std::string lidar_path = std::string(ROOT_DIR) + std::string("src/livox_ros_driver2/config/MID360_config.json");
-        //Ten::Ten_lidar::GetInstance(lidar_path);
-        //Ten::ThreadPool pool(5);
 
-        // pool.enqueue(test_receiver);
-        // pool.enqueue(test_serial);
-        // pool.enqueue(script_control);
-        // pool.enqueue(test_input);
-        // pool.enqueue(test_lidar_re);
-        // pool.enqueue(test_mapping_fast); 
-        // pool.enqueue(lidarR2_ekf_imu_withprotected);
-        // pool.enqueue(Loopcallback2);
-
-        // pool.enqueue(Ten::script_controlR1);
-        // pool.enqueue(Ten::superstratum::controlR1::serial_send_lidarR1_ekf_imu_withprotected);
-        // pool.enqueue(Ten::superstratum::controlR1::serial_receiver);
-        // pool.enqueue(Ten::LoopcallbackR1);
-        //pool.enqueue(Ten::R1_mapping_fast);
-
-        //laserMapping();
-
-        // ros::Rate sl(1);
-        // while(Ten::_TREADPOOL_FLAG_.read_flag())
-        // {
-        //     sl.sleep();
-        // }
-
+        // test_camera_detR1 不使用 ROS，放在 ros::init 之前避免 "Couldn't resolve requests"
         test_camera_detR1();
         
         return 0;
