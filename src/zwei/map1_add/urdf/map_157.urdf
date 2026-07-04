@@ -942,7 +942,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r101.dae" />
+                  filename="package://zwei/meshes/r129.dae" />
               </geometry>
               <material
                 name="">
@@ -995,7 +995,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r415.dae" />
+                  filename="package://zwei/meshes/r401.dae" />
               </geometry>
               <material
                 name="">
@@ -1048,7 +1048,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r501.dae" />
+                  filename="package://zwei/meshes/r502.dae" />
               </geometry>
               <material
                 name="">
@@ -1101,7 +1101,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r703.dae" />
+                  filename="package://zwei/meshes/r701.dae" />
               </geometry>
               <material
                 name="">
@@ -1154,7 +1154,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/r910.dae" />
+                  filename="package://zwei/meshes/r908.dae" />
               </geometry>
               <material
                 name="">
@@ -1207,7 +1207,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/ra05.dae" />
+                  filename="package://zwei/meshes/ra01.dae" />
               </geometry>
               <material
                 name="">
@@ -1260,7 +1260,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/rb28.dae" />
+                  filename="package://zwei/meshes/rb10.dae" />
               </geometry>
               <material
                 name="">
@@ -1313,7 +1313,7 @@
                 rpy="0 0 0" />
               <geometry>
                 <mesh
-                  filename="package://zwei/meshes/rc01.dae" />
+                  filename="package://zwei/meshes/rc13.dae" />
               </geometry>
               <material
                 name="">

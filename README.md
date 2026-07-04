@@ -137,8 +137,11 @@ rosrun 3dto2d hsv_detection_node
 - **优化** `PID.cpp` 控制器参数
 - **优化** `zbuffer_func` 主节点性能与稳定性
 
-### world_ws13.5
-*待更新*
+### world_ws13.5 — 地图数据更新与最终优化版
+- **优化** `zbuffer_func.cpp`: 主节点性能微调与稳定性改进
+- **更新** `map_*.txt` 地图数据集（大规模地图数据更新）
+- **更新** `flag.txt` 地图标志位配置
+- **更新** `wpr_simulation.zip` 仿真环境包
 
 ## 目录结构
 

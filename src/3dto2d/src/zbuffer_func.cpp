@@ -46,8 +46,8 @@ struct G
         _distCoeffs = cv::Mat::zeros(5, 1, CV_64F);
 
         // 设置工作空间目录 -> 清空txt文档 -> 确定sh文件内容 —> 开始自动录制数据集
-        workspace_path = "/home/h/RC2026/world_ws13";
-        datasets_path = "/home/h/视频/Datasets_new";
+        workspace_path = "/home/h/RC2026/world_ws13.5";
+        datasets_path = "/home/h/视频/datasets_blue_200";
 
         num = Ten::_OCCLUSION_HANDING_.get_txt_flag(workspace_path + "/src/zwei/map1_add");
         Ten::_OCCLUSION_HANDING_.write_txt_flag(num, workspace_path + "/src/zwei/map1_add");
