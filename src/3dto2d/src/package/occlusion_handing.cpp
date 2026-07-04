@@ -8,7 +8,7 @@ void Ten_occlusion_handing::set_box_lists_(
     const std::vector<cv::Point3f>& C_object_plum_points,
     const std::vector<cv::Point2f>& object_plum_2d_points,
     std::vector<box>& box_lists,
-    cv::Mat& object_zbuffer)
+    bool& is_update)
 {
 
     // 1. 取到 exist_boxes_ 和 interested_boxes_
@@ -30,8 +30,8 @@ void Ten_occlusion_handing::set_box_lists_(
 
     // 3. 填充 zbuffer 矩阵
     // 3.1 初始化深度缓冲（初始值为最大浮点数，表示无深度）
-    cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
-    object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+      cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+      cv::Mat object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
 
     // 3.2 检查surface_2d_point 2d点 合理性
     if (!(object_2d.size() == 36 && plum_2d.size() == 36)){
@@ -78,7 +78,11 @@ void Ten_occlusion_handing::set_box_lists_(
         // 3.4.1 收集方块所有2D点坐标， 并判断方块的所有点是否都在图像外
         std::vector<cv::Point2f> all_points;
         bool all_outside = set_all_outside(o_front,o_side,o_up,image.cols,image.rows,all_points);
-        if (all_outside) continue; 
+        if (all_outside) 
+        {
+            is_update = false;
+            continue;
+        }
         // 3.4.2 构建方块轮廓, 填充方块深度到临时矩阵 object_temp
         cv::Mat object_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
         set_temp(o_front,o_side,o_up,object_temp);
@@ -199,19 +203,17 @@ cv::Mat Ten_occlusion_handing::update_debug_image(
     cv::Mat img;
     image.copyTo(img);
 
-    for (size_t i = 0; i < object_plum_2d_points_.size(); i++) 
-    {
+    for (size_t i = 0; i < object_plum_2d_points_.size(); i++) {
         
         if (i < 96 && i % 8 == 0){
         cv::line(img, object_plum_2d_points_[i], object_plum_2d_points_[i + 1], cv::Scalar(0,255,0), 2, cv::LINE_AA);
         cv::line(img, object_plum_2d_points_[i + 1], object_plum_2d_points_[i + 2], cv::Scalar(0,255,0), 2, cv::LINE_AA);
         cv::line(img, object_plum_2d_points_[i + 2], object_plum_2d_points_[i + 3], cv::Scalar(0,255,0), 2, cv::LINE_AA);
         cv::line(img, object_plum_2d_points_[i + 3], object_plum_2d_points_[i], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        }   
     }   
+}
 return img;
 }
-
 void Ten_occlusion_handing::set_debug_roi_image(
     std::vector<Ten::box>box_lists,
     cv::Mat& debug_best_roi_image
@@ -267,8 +269,418 @@ void Ten_occlusion_handing::set_debug_roi_image(
             roi_images[vec_idx].copyTo(debug_best_roi_image(roi_rect));
         }
     }
+};
+  
+void Ten_occlusion_handing::save_dataset(
+        const std::vector<Ten::box>& box_lists,
+        const cv::Mat& image,
+        const std::vector<int> labels,
+        const std::string& save_dir,
+        cv::Mat rvec,
+        cv::Mat tvec,
+        int count
+    )
+    {
+        const std::string global_path = save_dir + "/global_images/images_" + std::to_string(count) + ".png" ;
+        const std::string labels_path = save_dir + "/labels/label_" + std::to_string(count) + ".json";
+        // const std::string roi_dir = save_dir + "/roi_images/roi_" + std::to_string(count);
+
+        bool save_global = cv::imwrite(global_path, image);
+        if (!save_global)
+        {
+            std::cout << "save global_image wrong" << std::endl;
+        }
+
+        std::vector<int> point_size;
+        std::vector<int> roi_valid_mask;
+        point_size.resize(12);
+        roi_valid_mask.resize(12);
+        // std::filesystem::create_directories(roi_dir);
+        for (int i = 0; i < box_lists.size(); i ++) 
+        {
+            // std::string roi_path = roi_dir + "/" + std::to_string(i + 1) + ".png";
+            // bool save_roi = cv::imwrite(roi_path, box_lists[i].roi_image);
+            // if (!save_roi)
+            // {
+            //     std::cout << "save global_image wrong" << std::endl;
+            // }
+            point_size[i] = box_lists[i].point_size;
+            roi_valid_mask[i] = box_lists[i].roi_valid_flag;
+        }
+
+        bool save_json = create_json_file(labels_path,point_size, labels,roi_valid_mask, rvec, tvec);
+    }
+    
+
+int Ten_occlusion_handing::getMaxImageNumber(const std::string &dir_path)
+{
+    int max_num = 0; // 初始值-1（无文件时返回-1）
+
+    // 打开目录
+    DIR *dir = opendir(dir_path.c_str());
+    if (!dir)
+    {
+        // 目录不存在或打开失败（已在createDirectoryIfNotExists中创建，此处仅警告）
+        ROS_WARN("Directory open failed: %s, err: %s", dir_path.c_str(), strerror(errno));
+        return max_num;
+    }
+
+    struct dirent *entry = nullptr;
+    // 遍历目录内所有文件/文件夹
+    while ((entry = readdir(dir)) != nullptr)
+    {
+        // 跳过 "." 和 ".." 目录
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        {
+            continue;
+        }
+
+        // 检查是否为普通文件（避免处理子目录）
+        std::string full_path = dir_path + "/" + entry->d_name;
+        struct stat st;
+        if (stat(full_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
+        {
+            continue;
+        }
+
+        // 解析文件名：必须是 "image_数字.png" 格式
+        std::string filename = entry->d_name;
+
+        std::regex pattern("_(\\d+)\\.png$");
+        std::smatch match;
+        std::string num_str;
+
+        if (std::regex_search(filename, match, pattern) && match.size() >= 1)
+        {
+            // std::cout << match.str() << std::endl;
+            num_str = match[1].str();
+            // std::cout << match[0].str() << std::endl;
+            // std::cout << num_str << std::endl;
+        }
+        else
+        {
+            throw std::invalid_argument("未匹配到目标数字：" + filename);
+        }
+
+        // 3. 字符串转整数（避免非数字字符崩溃）
+        try
+        {
+            int num = std::stoi(num_str);
+            if (num > max_num)
+            {
+                max_num = num;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            ROS_WARN("Invalid number in filename: %s, err: %s", filename.c_str(), e.what());
+            continue;
+        }
+    }
+
+    closedir(dir); // 关闭目录
+    return max_num;
 }
 
+    std::string Ten_occlusion_handing::get_txt_flag(std::string map_file_path)
+    {
+        // 判断flag.txt是否存在
+        std::filesystem::path flag_txt_path = std::filesystem::path(map_file_path) / "txt" / "flag.txt";
+        std::fstream flag_txt;
+        struct stat st;
+        if (stat(flag_txt_path.c_str(), &st) == 0) // 0表示文件存在
+        {
+            flag_txt = std::fstream(flag_txt_path, std::ios::in | std::ios::out | std::ios::app);
+            // std::cout << "1" << std::endl;
+        }
+        else
+        {
+            // std::cout << "2" << std::endl;
+            flag_txt = std::fstream(flag_txt_path, std::ios::in | std::ios::out | std::ios::trunc);
+        }
+
+        // //通过文件长度判断是否为
+        // std::streampos fileSize = flag_txt.tellg();
+        // if (fileSize == 0)
+        // {
+        //     flag_txt << "1" << std::endl;
+        //     flag_txt.close();
+        //     return "1";
+        // }
+
+        std::string lastLine = "-1";
+
+        std::string line;       // 存储每次读取的一行内容
+        int lineCount = 0;      // 行数计数器
+        // 逐行读取，直到文件末尾（getline读取失败时退出循环）
+        flag_txt.seekg(std::ios::beg);
+        while (std::getline(flag_txt, line)) 
+        {
+            lineCount++;
+            // 优化：如果行数超过1，可提前退出循环，无需继续读取
+            if (lineCount > 1) 
+            {
+                break;
+            }
+        }
+
+        std::cout << "lineCount" << lineCount << std::endl;
+ 
+        if (lineCount == 0) 
+        {
+            std::cout << "1" << std::endl;
+            lastLine = "0";
+        }
+        else if(lineCount == 1)
+        {
+            std::cout << "2" << std::endl;
+            flag_txt.clear();
+            flag_txt.seekg(std::ios::beg);
+            std::getline(flag_txt, lastLine);
+            std::cout << "lastline: " << lastLine << std::endl;
+        }
+        else
+        {
+            std::cout << "3" << std::endl;
+            flag_txt.seekg(0, std::ios::end);
+            std::streampos fileSize = flag_txt.tellg();
+            std::streampos pos = fileSize - 1;
+            while (pos > 0)
+            {
+                pos -= 1;
+                flag_txt.seekg(pos);
+                char c;
+                flag_txt.get(c);
+
+                if (c == '\n')
+                {
+                    // 找到换行符，读取剩余内容
+                    std::getline(flag_txt, lastLine);
+                    break;
+                }
+            }
+        }
+
+        // // 读取最后一行的数据
+        // // 将文件指针移动到文件末尾
+        // flag_txt.seekg(0, std::ios::end);
+        // std::streampos fileSize = flag_txt.tellg();
+
+        // // std::cout << "fileSize" << fileSize << std::endl;
+        // // std::cout << "1" << std::endl;
+
+        // // std::cout << "2" << std::endl;
+
+        // // std::cout << "pos: " << pos << std::endl;
+
+        // // 从文件末尾向前查找换行符
+        // // 如果文件无内容
+        // if (fileSize == 0)
+        // {
+        //     std::cout << "1" << std::endl;
+        //     // flag_txt.seekg(0);
+        //     // std::getline(flag_txt, lastLine);
+        //     lastLine = "0";
+        // }
+        // else if (fileSize == 2) // 只有一行
+        // {
+        //     std::cout << "2" << std::endl;
+        //     // lastLine = "1";
+        //     std::getline(flag_txt,lastLine);
+        // } // 待优化：如果不小心删掉了换行符，就会错位
+        // else
+        // {
+        //     std::cout << "3" << std::endl;
+        //     std::streampos pos = fileSize - 1;
+        //     while (pos > 0)
+        //     {
+        //         pos -= 1;
+        //         flag_txt.seekg(pos);
+        //         char c;
+        //         flag_txt.get(c);
+
+        //         if (c == '\n')
+        //         {
+        //             // 找到换行符，读取剩余内容
+        //             std::getline(flag_txt, lastLine);
+        //             break;
+        //         }
+        //     }
+        // }
+
+        // std::cout << "lastLine: " << lastLine << std::endl;
+
+        std::string current_flag = std::to_string(atoi(lastLine.c_str()) + 1); // 当前序号
+
+        // // 写入当前序号
+        // flag_txt << current_flag << std::endl;
+
+        flag_txt.close();
+        return current_flag;
+    }
+
+    void Ten_occlusion_handing::write_txt_flag(std::string current_flag, std::string map_file_path)
+    {
+        std::filesystem::path flag_txt_path = std::filesystem::path(map_file_path) / "txt" / "flag.txt";
+        std::fstream flag_txt(flag_txt_path, std::ios::in | std::ios::app);
+        // 写入当前序号
+        flag_txt << current_flag << std::endl;
+        flag_txt.close();
+    }
+  
+bool Ten_occlusion_handing::write_label_txt(const std::string& txt_path, int label, int cls) {
+    try {
+        // 确保TXT文件父目录存在
+        std::filesystem::create_directories(std::filesystem::path(txt_path).parent_path());
+        
+        // 打开TXT文件（覆盖已有内容）
+        std::ofstream out_file(txt_path, std::ios::out | std::ios::trunc);
+        if (!out_file.is_open()) {
+            std::cerr << "错误：无法打开TXT文件 -> " << txt_path << std::endl;
+            return false;
+        }
+        // 写入内容：第一行label，第二行cls
+        out_file << label << std::endl;
+        out_file << cls << std::endl;
+        out_file.close();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "错误：写入TXT文件失败 -> " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// 主函数实现（简化为直接保存指定的ROI图像和TXT）
+void Ten_occlusion_handing::save_dataset_txt(
+    const cv::Mat& roi_image,
+    int label,
+    int cls,
+    const std::string& save_txt_path,
+    const std::string& save_roi_image_path
+) {
+    // 1. 保存ROI图像（确保父目录存在）
+    std::filesystem::create_directories(std::filesystem::path(save_roi_image_path).parent_path());
+    bool save_roi = cv::imwrite(save_roi_image_path, roi_image);
+    if (!save_roi) {
+        std::cerr << "错误：保存ROI图像失败 -> " << save_roi_image_path << std::endl;
+    } else {
+        std::cout << "成功保存ROI图像 -> " << save_roi_image_path << std::endl;
+    }
+
+    // 2. 保存标签为TXT文件
+    bool save_txt = write_label_txt(save_txt_path, label, cls);
+    if (save_txt) {
+        std::cout << "成功保存标签TXT -> " << save_txt_path << std::endl;
+    }
+}
+
+std::vector<cv::Mat> Ten_occlusion_handing::loadSortedImages(const std::string& folderPath) {
+    // 1. 检查文件夹是否存在
+    namespace fs = std::filesystem;
+    if (!fs::is_directory(folderPath)) {
+        throw std::invalid_argument("文件夹不存在: " + folderPath);
+    }
+
+    // 定义图片后缀（可根据需要扩展，如.tiff/.gif）
+    const std::vector<std::string> imageExts = {".jpg", ".jpeg", ".png", ".bmp"};
+    // 用于临时存储：键=提取的整数，值=图片路径（确保1-12每个数对应一个路径）
+    std::vector<std::string> imgPaths(12, "");
+    // 正则表达式：匹配第一个连续的数字序列（提取文件名中的第一个整数）
+    const std::regex numRegex(R"(\d+)");
+
+    // 2. 遍历文件夹中的所有文件
+    for (const auto& entry : fs::directory_iterator(folderPath)) {
+        // 跳过目录，只处理文件
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+
+        // 获取文件路径和后缀
+        const fs::path filePath = entry.path();
+        const std::string ext = filePath.extension().string();
+        // 转换为小写，避免大小写问题（如.JPG/.jpg）
+        std::string extLower = ext;
+        std::transform(extLower.begin(), extLower.end(), extLower.begin(), ::tolower);
+
+        // 3. 过滤出图片文件
+        bool isImage = false;
+        for (const auto& e : imageExts) {
+            if (extLower == e) {
+                isImage = true;
+                break;
+            }
+        }
+        if (!isImage) {
+            continue;
+        }
+
+        // 4. 提取文件名中的第一个整数
+        const std::string fileName = filePath.filename().string();
+        std::smatch match;
+        if (!std::regex_search(fileName, match, numRegex)) {
+            std::cerr << "警告：文件 " << fileName << " 中未找到整数，已跳过" << std::endl;
+            continue;
+        }
+
+        // 转换为整数并验证范围
+        int imgNum = std::stoi(match.str());
+        if (imgNum < 1 || imgNum > 12) {
+            std::cerr << "警告：文件 " << fileName << " 提取的整数 " << imgNum 
+                      << " 不在1-12范围内，已跳过" << std::endl;
+            continue;
+        }
+
+        // 检查是否重复（同一数字对应多个文件）
+        if (!imgPaths[imgNum - 1].empty()) {
+            throw std::runtime_error("发现重复整数 " + std::to_string(imgNum) + 
+                                     " 的图片：" + imgPaths[imgNum - 1] + " 和 " + fileName);
+        }
+
+        // 存储路径（imgNum-1是因为vector索引从0开始，对应1→0，12→11）
+        imgPaths[imgNum - 1] = filePath.string();
+    }
+
+    // 5. 验证是否收集到12个有效路径
+    for (int i = 0; i < 12; ++i) {
+        if (imgPaths[i].empty()) {
+            throw std::runtime_error("未找到整数为 " + std::to_string(i + 1) + " 的图片");
+        }
+    }
+
+    // 6. 按1-12顺序读取图片到cv::Mat容器
+    std::vector<cv::Mat> result;
+    result.reserve(12); // 预分配空间，提升性能
+    for (int i = 0; i < 12; ++i) {
+        cv::Mat img = cv::imread(imgPaths[i], cv::IMREAD_COLOR);
+        if (img.empty()) {
+            throw std::runtime_error("图片读取失败：" + imgPaths[i]);
+        }
+        result.push_back(img);
+    }
+
+    return result;
+}
+
+void Ten_occlusion_handing::printHanContainer(const std::vector<han>& hanContainer) {
+    // 打印表头，提升可读性
+    std::cout << std::fixed << std::setprecision(2);  // 浮点数保留2位小数（可按需调整）
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "序号 | invalid | valid_empty | valid_exist" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+
+    // 遍历容器（范围for循环，简洁且安全）
+    int index = 1;  // 序号（从1开始，符合直观习惯）
+    for (const auto& item : hanContainer) {
+        // 格式化打印每个属性，对齐输出
+        std::cout << std::setw(3) << index << " | "
+                  << std::setw(7) << item.invalid << " | "
+                  << std::setw(10) << item.valid_empty << " | "
+                  << std::setw(10) << item.valid_exist << std::endl;
+        index++;
+    }
+
+    std::cout << "----------------------------------------" << std::endl;
+}
     Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
     Ten::init_3d_box _INIT_3D_BOX_;
 }       // namespace Ten

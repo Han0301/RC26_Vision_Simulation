@@ -28,19 +28,22 @@
 #include <sys/stat.h> // Linux文件状态
 #include <geometry_msgs/Twist.h>
 #include <filesystem>
-
 namespace Ten{
 
-#define _L_ 1.2
-#define _H_ 0.2
-#define _ly1_ 0.425
-#define _ly2_ 0.775
-#define _lx1_ 0.425
-#define _lh_ 0.35 
-#define _X_  3.17             
-#define _Y_  1.2  
+#define L_ 1.2f                 // 台阶长度
+#define H_ 0.2f                 // 台阶高度
+#define lx1_ 0.425f             // 台阶到方块的间距
+#define ly1_ 0.425f             // 台阶到方块的间距
+#define lh_ 0.35f               // 方块的长度
+#define X_ 3.2f                 // 初始位置到梅花林1号位置边角的x轴距离
+#define Y_ -1.2f                // 初始位置到梅花林1号位置边角的y轴距离
+#define LIDAR_HEIGHT_ 0         // 雷达的高度 
+#define box_half_length_ 0.175  // 方块长度的一半
+#define step_half_length_ 0.6   //台阶水平边长的一半
+#define offset_x_ 0.08             // x方向上的偏移量
+#define offset_y_ 0.08             // y方向上的偏移量
+#define offset_z_ 0.08             // z方向上的偏移量
 
-// 表示每个面的框的 2d点信息
 struct surface_2d_point {        
     int idx;                       // 对应方块索引
     cv::Point2f left_up;           // 左上2D点
@@ -61,7 +64,6 @@ struct box{
     int roi_valid_flag = 0;
 };
 
-// 表示每个位置的方块存在情况
 struct han {
     float invalid;      // 无效值
     float valid_empty;  // 有效但空值
@@ -81,8 +83,6 @@ struct init_3d_box{
     std::vector<cv::Point2f> object_plum_2d_points_;
 
     std::vector<box> box_lists_;
-
-    cv::Mat object_zbuffer;
 
     // 无参构造函数
     init_3d_box()
@@ -104,66 +104,38 @@ struct init_3d_box{
         }
 
         // 初始化 W_object_plum_points_
-        float _arr[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
+        float arr_[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));
-                W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));
-                W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));                
-                W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));                
-                W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+                // 方块8个3D点
+                W_object_plum_points_[(j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);                
+                W_object_plum_points_[(j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);                
+                W_object_plum_points_[(j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
             }
         } 
-
-        // 1.2 包围盒
-        // for(int j = 0; j < 4; j++) {
-        //     for(int i = 0; i < 3; i++) {
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ , _arr[j*3+i]+_lh_));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]+_lh_));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ , _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ , _arr[j*3+i]+_lh_));                
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]+_lh_));                
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ , _arr[j*3+i]));
-        //     }
-        // } 
-
-        // 0.6 包围盒
-        // for(int j = 0; j < 4; j++) {
-        //     for(int i = 0; i < 3; i++) {
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.3, _arr[j*3+i]+_lh_));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.9, _arr[j*3+i]+_lh_));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.9, _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.3, _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.3, _arr[j*3+i]+_lh_));                
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.9, _arr[j*3+i]+_lh_));                
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.9, _arr[j*3+i]));
-        //         W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.3, _arr[j*3+i]));
-        //     }
-        // } 
-
-        // 台阶8个3D点（先颠倒X/Y坐标，再将新X取反）
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, 0));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, 0));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, 0 ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, 0));
+                // 台阶8个3D点
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, 0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      0 + offset_z_);
             }
-        }  
+        }    
 
         // 初始化 LM_object_plum_points_，C_object_plum_points_，pcl_LM_plum_object_points_，pcl_C_plum_object_points_
         for(int i = 0; i < 96 * 2; i++){
             //减雷达高度
-            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
+            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z - LIDAR_HEIGHT_);
             C_object_plum_points_[i]  = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
             pcl::PointXYZ tmp;
             tmp.x = LM_object_plum_points_[i].x;
@@ -225,7 +197,7 @@ public:
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
         std::vector<box>& box_lists,
-        cv::Mat& object_zbuffer);
+        bool& is_update);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -247,6 +219,38 @@ public:
     void set_debug_roi_image(
         std::vector<Ten::box>box_lists,
         cv::Mat& debug_best_roi_image);
+
+    void save_dataset(
+        const std::vector<Ten::box>& box_lists,
+        const cv::Mat& image,
+        const std::vector<int> labels,
+        const std::string& save_dir,
+        cv::Mat rvec,
+        cv::Mat tvec,
+        int count_
+    );
+int getMaxImageNumber(const std::string &dir_path);
+std::string get_txt_flag(std::string map_file_path);
+void write_txt_flag(std::string current_flag, std::string map_file_path);
+void save_dataset_txt(
+    const cv::Mat& roi_image,
+    int label,
+    int cls,
+    const std::string& save_txt_path,
+    const std::string& save_roi_image_path
+);
+bool write_label_txt(const std::string& txt_path, int label, int cls);
+std::vector<cv::Mat> loadSortedImages(const std::string& folderPath);
+
+void printHanContainer(const std::vector<han>& hanContainer);
+
+
+
+
+
+
+
+
 
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
@@ -409,6 +413,162 @@ private:
         } 
         return update_image;
     }
+
+/**
+ * @brief 辅助函数：将cv::Mat转换为JSON数组字符串（适配1x3/3x1的向量矩阵）
+ * @param mat 待转换的矩阵（预期为1x3/3x1的float/double型）
+ * @param field_name 字段名（仅用于日志提示）
+ * @return 格式化的JSON数组字符串，异常时返回空字符串
+ */
+std::string mat_to_json_array(const cv::Mat& mat, const std::string& field_name) {
+    // 校验矩阵非空
+    if (mat.empty()) {
+        std::cerr << "警告：" << field_name << " 矩阵为空！" << std::endl;
+        return "[]";
+    }
+
+    // 校验矩阵维度（仅支持1x3或3x1）
+    if (!((mat.rows == 1 && mat.cols == 3) || (mat.rows == 3 && mat.cols == 1))) {
+        std::cerr << "警告：" << field_name << " 维度非1x3/3x1（当前：" 
+                  << mat.rows << "x" << mat.cols << "），将按原始维度序列化！" << std::endl;
+    }
+
+    // 遍历矩阵元素，拼接JSON数组
+    std::string arr_str = "[";
+    for (int i = 0; i < mat.rows; ++i) {
+        for (int j = 0; j < mat.cols; ++j) {
+            // 兼容float/double类型的Mat
+            if (mat.type() == CV_32F) {
+                arr_str += std::to_string(mat.at<float>(i, j));
+            } else if (mat.type() == CV_64F) {
+                arr_str += std::to_string(mat.at<double>(i, j));
+            } else {
+                std::cerr << "警告：" << field_name << " 矩阵类型非float/double（type=" << mat.type() << "）！" << std::endl;
+                arr_str += "0.0";
+            }
+            // 非最后一个元素加逗号
+            if (!(i == mat.rows - 1 && j == mat.cols - 1)) {
+                arr_str += ", ";
+            }
+        }
+    }
+    arr_str += "]";
+    return arr_str;
+}
+
+/**
+ * @brief 纯标准库生成JSON文件，适配rvec/tvec矩阵写入
+ * @param json_path JSON文件完整保存路径（保证有效，如./data/result.json）
+ * @param point_size int型vector：点尺寸数据
+ * @param labels int型vector：标签数据（替代原string）
+ * @param roi_valid_mask int型vector：ROI掩码数据（替代原bool，如0/1表示false/true）
+ * @param rvec cv::Mat：旋转向量（预期1x3/3x1 float/double）
+ * @param tvec cv::Mat：平移向量（预期1x3/3x1 float/double）
+ * @return true 保存成功，false 保存失败
+ */
+bool create_json_file(const std::string& json_path,
+                      const std::vector<int>& point_size,
+                      const std::vector<int>& labels,
+                      const std::vector<int>& roi_valid_mask,
+                      cv::Mat rvec,
+                      cv::Mat tvec) {
+    // ========== 第一步：提取并创建JSON父目录 ==========
+    std::filesystem::path full_path(json_path);
+    std::filesystem::path parent_dir = full_path.parent_path();
+
+    try {
+        if (!std::filesystem::exists(parent_dir)) {
+            if (!std::filesystem::create_directories(parent_dir)) {
+                std::cerr << "创建JSON父目录失败：" << parent_dir << std::endl;
+                return false;
+            }
+            std::cout << "JSON父目录创建成功：" << parent_dir << std::endl;
+        } else if (!std::filesystem::is_directory(parent_dir)) {
+            std::cerr << "错误：" << parent_dir << " 不是有效目录（被文件占用）" << std::endl;
+            return false;
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "目录操作异常：" << e.what() << std::endl;
+        return false;
+    }
+
+    // ========== 第二步：校验vector长度（可选，提示非12长度） ==========
+    if (point_size.size() != 12 || labels.size() != 12 || roi_valid_mask.size() != 12) {
+        std::cerr << "警告：传入的int型vector长度非12！" << std::endl;
+        std::cerr << "point_size长度：" << point_size.size() << std::endl;
+        std::cerr << "labels长度：" << labels.size() << std::endl;
+        std::cerr << "roi_valid_mask长度：" << roi_valid_mask.size() << std::endl;
+    }
+
+    // ========== 第三步：拼接JSON字符串（新增rvec/tvec字段） ==========
+    std::string json_str = "{\n";
+    // 1. 拼接point_size（int型，无引号）
+    json_str += "    \"point_size\": [";
+    for (std::size_t i = 0; i < point_size.size(); ++i) {
+        json_str += std::to_string(point_size[i]);
+        if (i != point_size.size() - 1) {
+            json_str += ", ";
+        }    
+        
+    }
+    json_str += "],\n";
+
+    // 2. 拼接labels（int型，无引号）
+    json_str += "    \"labels\": [";
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+        json_str += std::to_string(labels[i]);
+        if (i != labels.size() - 1) {
+            json_str += ", ";
+        }
+    }
+    json_str += "],\n";
+
+    // 3. 拼接roi_valid_mask（int型）
+    json_str += "    \"roi_valid_mask\": [";
+    for (std::size_t i = 0; i < roi_valid_mask.size(); ++i) {
+        json_str += std::to_string(roi_valid_mask[i]);
+        if (i != roi_valid_mask.size() - 1) {
+            json_str += ", ";
+        }
+    }
+    json_str += "],\n"; // 注意此处加逗号，因为后面还有字段
+
+    // 4. 拼接rvec（旋转向量，转换为JSON数组）
+    json_str += "    \"rvec\": " + mat_to_json_array(rvec, "rvec") + ",\n";
+
+    // 5. 拼接tvec（平移向量，转换为JSON数组）
+    json_str += "    \"tvec\": " + mat_to_json_array(tvec, "tvec") + "\n"; // 最后一个字段不加逗号
+
+    // 闭合JSON
+    json_str += "}";
+
+    // ========== 第四步：写入JSON文件 ==========
+    std::ofstream json_file(full_path, std::ios::out | std::ios::trunc);
+    if (!json_file.is_open()) {
+        std::cerr << "无法打开JSON文件：" << full_path << std::endl;
+        return false;
+    }
+    json_file << json_str;
+    json_file.close();
+
+    std::cout << "JSON文件保存成功：" << full_path << std::endl;
+    std::cout << "\n生成的JSON内容：\n" << json_str << std::endl;
+    return true;
+}
+
+// 测试示例（可选）
+int main() {
+    // 构造测试数据
+    std::vector<int> point_size(12, 10);
+    std::vector<int> labels(12, 1);
+    std::vector<int> roi_valid_mask(12, 0);
+    cv::Mat rvec = (cv::Mat_<float>(1, 3) << 0.1, 0.2, 0.3);
+    cv::Mat tvec = (cv::Mat_<double>(3, 1) << 1.0, 2.0, 3.0);
+
+    // 调用函数
+    create_json_file("./data/result.json", point_size, labels, roi_valid_mask, rvec, tvec);
+    return 0;
+}
 
 };
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;

@@ -115,8 +115,17 @@ rosrun 3dto2d hsv_detection_node
 - **优化** `occlusion_handing` 遮挡处理算法
 - **优化** `zbuffer_func` 主节点性能
 
-### world_ws12
-*待更新*
+### world_ws12 — PID 控制与运动恢复版
+- **新增** `PID.cpp`: PID 控制器模块，提升运动控制精度
+- **新增** `basemove2.cpp`: 基础运动控制 v2
+- **恢复** `camera_calibration.cpp`: 相机标定功能重新整合
+- **恢复** `move_controller.cpp/h`: 运动控制模块回迁
+- **恢复** 数据集相关脚本（`change_debug_to_data.py`, `random_create_map.py`）
+- **恢复** `zbuffer_func.launch` 启动文件
+- **移除** `deviation_handing` 偏差处理（整合至其他模块）
+- **移除** `edge_handing` / `hsv_handing` 边缘与 HSV 模块
+- **优化** `occlusion_handing` 遮挡处理
+- **优化** `zbuffer_func` 主节点融合运动控制
 
 ### world_ws13
 *待更新*
