@@ -31,7 +31,7 @@
 #include "package/method_math.h"
 #include "package/occlusion_handing.h"     
 #include "package/world_to_camera.h"  
-
+#include "package/move_controller.h"
 
 struct G
 {
@@ -44,6 +44,10 @@ struct G
             0, 0, 1);
         // 2. 畸变系数（假设零畸变）
         _distCoeffs = cv::Mat::zeros(5, 1, CV_64F);
+        num = Ten::_OCCLUSION_HANDING_.get_txt_flag("/home/h/RC2026/world_ws10/src/zwei/map1_add");
+        Ten::_OCCLUSION_HANDING_.write_txt_flag(num, "/home/h/RC2026/world_ws10/src/zwei/map1_add");
+        // num += 1;
+
     }
 
     std::vector<Ten::box> box_lists;
@@ -60,8 +64,7 @@ struct G
 
     image_transport::Publisher zbuffer_pub;
 
-    int time_count = 0;
-    std::chrono::microseconds time_total;
+    std::string num;
 
     nav_msgs::Odometry::ConstPtr robot_pose;  // 缓存位姿数据
     bool pose_updated = false;              // 位姿更新标记
@@ -71,6 +74,160 @@ struct G
 
 void zbuffer_process()
 {
+    std::vector<std::vector<int>> data = {
+        {1,1,1,1,0,1,0,1,0,1,1,0},   // 第1组
+        {1,1,0,1,1,0,1,1,0,0,1,1},   // 第2组
+        {1,1,1,1,1,0,0,1,1,1,0,0},   // 第3组
+        {1,1,0,0,1,0,1,1,1,1,1,0},   // 第4组
+        {1,1,1,0,0,1,0,1,1,0,1,1},   // 第5组
+        {1,0,0,1,0,1,0,1,1,1,1,1},   // 第6组
+        {0,1,1,0,1,1,1,0,1,1,0,1},   // 第7组
+        {0,1,1,1,1,1,0,1,0,0,1,1},   // 第8组
+        {1,1,1,0,1,1,1,1,1,0,0,0},   // 第9组
+        {1,1,0,1,1,1,1,0,1,0,0,1},   // 第10组
+        {1,0,0,1,1,1,0,1,1,1,0,1},   // 第11组
+        {1,1,1,1,0,1,0,0,1,0,1,1},   // 第12组
+        {0,1,1,1,1,0,0,1,1,0,1,1},   // 第13组
+        {1,0,1,1,1,1,0,1,0,1,0,1},   // 第14组
+        {0,1,1,1,1,1,1,1,1,0,0,0},   // 第15组
+        {1,0,1,1,1,0,1,1,1,0,0,1},   // 第16组
+        {1,1,1,1,1,0,1,0,0,1,0,1},   // 第17组
+        {1,0,1,1,1,0,1,1,1,1,0,0},   // 第18组
+        {1,1,1,0,1,1,0,0,1,1,0,1},   // 第19组
+        {0,0,1,0,1,1,1,1,0,1,1,1},   // 第20组
+        {1,1,0,1,0,1,0,1,1,0,1,1},   // 第21组
+        {0,1,1,1,1,1,0,0,1,0,1,1},   // 第22组
+        {1,1,1,1,1,1,1,0,0,0,1,0},   // 第23组
+        {0,1,1,0,1,1,1,0,1,1,0,1},   // 第24组
+        {0,1,0,0,1,1,0,1,1,1,1,1},   // 第25组
+        {1,1,0,1,0,1,1,1,0,0,1,1},   // 第26组
+        {1,1,1,0,0,1,0,0,1,1,1,1},   // 第27组
+        {1,1,1,1,0,0,1,0,0,1,1,1},   // 第28组
+        {1,1,0,1,1,1,1,0,1,1,0,0},   // 第29组
+        {1,1,1,0,0,0,1,1,0,1,1,1},   // 第30组
+        {0,1,1,1,1,1,0,1,0,1,0,1},   // 第31组
+        {1,1,0,1,0,1,1,1,0,0,1,1},   // 第32组
+        {1,1,1,1,0,1,1,0,0,0,1,1},   // 第33组
+        {0,0,1,0,0,1,1,1,1,1,1,1},   // 第34组
+        {0,1,1,1,0,0,0,1,1,1,1,1},   // 第35组
+        {1,1,1,1,1,1,1,0,0,0,0,1},   // 第36组
+        {1,0,0,1,1,0,1,1,1,1,0,1},   // 第37组
+        {1,0,1,1,0,1,0,1,1,0,1,1},   // 第38组
+        {0,1,1,1,1,1,1,0,1,0,0,1},   // 第39组
+        {0,1,1,1,1,1,1,1,0,1,0,0},   // 第40组
+        {0,0,1,1,1,1,1,1,0,1,1,0},   // 第41组
+        {1,1,1,0,1,1,0,1,1,1,0,0},   // 第42组
+        {1,1,1,0,0,1,1,0,1,1,0,1},   // 第43组
+        {1,1,0,1,1,1,0,0,1,1,0,1},   // 第44组
+        {1,0,1,1,1,0,1,1,0,0,1,1},   // 第45组
+        {1,1,0,1,0,1,1,0,0,1,1,1},   // 第46组
+        {1,1,1,0,0,1,1,0,0,1,1,1},   // 第47组
+        {1,1,0,1,1,0,1,0,1,1,1,0},   // 第48组
+        {1,1,1,1,1,0,1,0,0,1,1,0},   // 第49组
+        {0,1,1,1,0,0,1,1,1,1,1,0},   // 第50组
+        {1,1,1,1,0,1,0,0,1,1,0,1},   // 第51组
+        {1,0,0,0,1,1,1,0,1,1,1,1},   // 第52组
+        {0,1,1,0,1,1,1,0,1,1,0,1},   // 第53组
+        {1,1,1,1,1,1,0,1,0,1,0,0},   // 第54组
+        {1,1,1,1,1,0,1,0,1,0,1,0},   // 第55组
+        {0,1,1,1,1,1,1,1,1,0,0,0},   // 第56组
+        {1,0,0,1,0,1,1,1,1,0,1,1},   // 第57组
+        {1,0,0,0,1,1,1,1,1,0,1,1},   // 第58组
+        {1,1,1,0,1,1,1,0,0,1,1,0},   // 第59组
+        {1,0,1,1,1,0,1,1,0,0,1,1},   // 第60组
+        {0,1,0,1,0,1,1,0,1,1,1,1},   // 第61组
+        {1,1,1,1,1,1,1,0,0,0,0,1},   // 第62组
+        {0,1,1,1,1,1,1,0,0,0,1,1},   // 第63组
+        {1,1,0,1,0,1,1,1,0,1,1,0},   // 第64组
+        {1,0,1,1,1,0,1,0,0,1,1,1},   // 第65组
+        {0,1,1,1,0,1,1,1,1,0,1,0},   // 第66组
+        {0,1,1,1,1,1,1,0,1,1,0,0},   // 第67组
+        {0,0,1,1,1,1,1,1,0,1,0,1},   // 第68组
+        {1,1,1,0,1,0,1,1,0,0,1,1},   // 第69组
+        {1,1,1,0,0,0,1,1,1,1,0,1},   // 第70组
+        {1,1,0,1,1,1,1,0,0,0,1,1},   // 第71组
+        {1,1,1,0,1,1,1,0,1,0,0,1},   // 第72组
+        {1,0,0,0,1,1,0,1,1,1,1,1},   // 第73组
+        {0,1,0,1,0,1,0,1,1,1,1,1},   // 第74组
+        {1,0,1,0,1,1,0,1,1,1,0,1},   // 第75组
+        {0,1,1,1,0,1,1,0,1,1,0,1},   // 第76组
+        {1,0,1,1,0,0,1,1,1,1,1,0},   // 第77组
+        {1,1,0,1,1,1,1,0,0,0,1,1},   // 第78组
+        {1,1,1,1,1,0,1,1,0,0,0,1},   // 第79组
+        {1,0,1,0,0,1,1,0,1,1,1,1},   // 第80组
+        {1,1,1,0,1,1,0,0,1,1,0,1},   // 第81组
+        {1,1,1,0,1,1,0,1,0,1,1,0},   // 第82组
+        {0,1,1,1,1,0,1,0,1,1,1,0},   // 第83组
+        {1,1,1,0,1,0,1,1,0,0,1,1},   // 第84组
+        {1,1,1,1,0,0,1,1,1,0,1,0},   // 第85组
+        {1,1,1,1,0,1,1,0,1,0,1,0},   // 第86组
+        {1,0,1,1,1,1,1,0,1,0,1,0},   // 第87组
+        {1,1,1,1,1,1,0,0,0,0,1,1},   // 第88组
+        {1,1,1,0,1,0,1,1,1,1,0,0},   // 第89组
+        {0,1,1,1,1,0,0,0,1,1,1,1},   // 第90组
+        {1,0,0,1,1,0,1,1,1,1,0,1},   // 第91组
+        {1,1,0,0,1,1,1,0,1,1,0,1},   // 第92组
+        {0,1,1,0,1,1,1,1,0,1,0,1},   // 第93组
+        {1,1,1,1,0,1,0,1,0,0,1,1},   // 第94组
+        {0,1,1,1,0,1,0,1,1,1,1,0},   // 第95组
+        {1,0,0,1,1,0,1,1,1,1,1,0},   // 第96组
+        {1,1,1,1,1,1,0,0,0,0,1,1},   // 第97组
+        {1,1,0,0,1,0,1,1,1,1,1,0},   // 第98组
+        {1,0,1,1,1,1,1,1,0,0,0,1},   // 第99组
+        {1,1,0,0,0,1,0,1,1,1,1,1},   // 第100组
+        {1,0,1,1,0,1,1,1,1,1,0,0},   // 第101组
+        {1,1,1,1,0,1,1,0,0,1,1,0},   // 第102组
+        {0,1,1,0,0,1,1,1,1,1,0,1},   // 第103组
+        {1,1,1,1,1,0,0,1,0,0,1,1},   // 第104组
+        {1,1,0,1,0,0,1,1,0,1,1,1},   // 第105组
+        {1,1,0,0,1,1,0,1,1,0,1,1},   // 第106组
+        {1,1,1,0,1,1,0,0,1,1,1,0},   // 第107组
+        {1,1,0,0,0,1,1,0,1,1,1,1},   // 第108组
+        {1,0,0,1,1,1,1,1,0,1,0,1},   // 第109组
+        {1,0,1,1,1,1,1,0,0,0,1,1},   // 第110组
+        {1,1,0,1,0,1,1,1,0,1,0,1},   // 第111组
+        {1,0,1,1,1,0,1,1,1,0,1,0},   // 第112组
+        {1,1,1,1,0,1,0,1,0,1,0,1},   // 第113组
+        {1,1,0,1,0,0,1,0,1,1,1,1},   // 第114组
+        {1,0,1,0,1,0,1,1,1,0,1,1},   // 第115组
+        {1,0,0,0,0,1,1,1,1,1,1,1},   // 第116组
+        {0,1,1,1,0,0,1,1,1,1,1,0},   // 第117组
+        {1,0,1,1,0,1,0,1,1,1,1,0},   // 第118组
+        {0,1,1,1,1,0,1,1,1,0,0,1},   // 第119组
+        {1,1,0,1,0,1,0,1,1,1,1,0},   // 第120组
+        {1,1,0,1,1,1,0,1,0,1,1,0},   // 第121组
+        {1,1,1,1,1,1,0,0,0,0,1,1},   // 第122组
+        {1,1,1,1,1,0,0,0,0,1,1,1},   // 第123组
+        {0,1,0,1,0,0,1,1,1,1,1,1},   // 第124组
+        {1,0,1,0,1,0,1,1,0,1,1,1},   // 第125组
+        {1,0,0,1,0,0,1,1,1,1,1,1},   // 第126组
+        {1,1,0,0,1,1,1,0,1,1,0,1},   // 第127组
+        {0,0,1,1,0,1,0,1,1,1,1,1},   // 第128组
+        {0,1,1,1,1,1,1,0,1,0,1,0},   // 第129组
+        {0,1,1,1,0,0,1,0,1,1,1,1},   // 第130组
+        {1,0,1,1,1,1,0,1,0,0,1,1},   // 第131组
+        {1,1,1,1,0,1,0,1,0,1,1,0},   // 第132组
+        {0,1,1,1,0,1,1,0,1,0,1,1},   // 第133组
+        {1,1,1,0,0,1,1,1,1,0,0,1},   // 第134组
+        {0,1,1,1,1,0,1,1,0,1,0,1},   // 第135组
+        {0,1,0,0,1,1,1,1,1,1,1,0},   // 第136组
+        {1,1,1,0,0,1,1,0,1,0,1,1},   // 第137组
+        {1,1,1,1,1,1,0,0,1,0,0,1},   // 第138组
+        {1,1,0,1,1,1,1,1,0,0,0,1},   // 第139组
+        {1,0,0,1,1,1,1,1,1,1,0,0},   // 第140组
+        {1,1,1,0,1,1,1,0,0,0,1,1},   // 第141组
+        {1,1,0,1,0,1,1,1,1,1,0,0},   // 第142组
+        {0,1,0,0,1,1,1,1,1,1,1,0},   // 第143组
+        {1,0,1,1,0,1,0,1,0,1,1,1},   // 第144组
+        {0,1,0,0,0,1,1,1,1,1,1,1},   // 第145组
+        {1,0,1,0,1,0,0,1,1,1,1,1},   // 第146组
+        {1,1,0,1,1,0,1,0,1,1,0,1},   // 第147组
+        {1,1,0,1,0,1,0,1,1,1,1,0},   // 第148组
+        {1,1,1,0,0,1,1,1,1,0,0,1},   // 第149组
+        {1,1,1,1,0,0,1,0,1,1,0,1}    // 第150组
+    };
+
+
     if (!global.pose_updated || !global.image_updated)
     {
         ROS_DEBUG("数据未更新，跳过处理");
@@ -81,70 +238,96 @@ void zbuffer_process()
     {
         std::lock_guard<std::mutex> lock(global.data_mutex);
         tf = Ten::Nav_Odometrytoxyzrpy(*global.robot_pose);
-        tf._xyz._z = tf._xyz._z - 0.05;
+        float x = tf._xyz._x;
+        tf._xyz._x = -tf._xyz._y;
+        tf._xyz._y = x;
     }
 
-    // std::cout << "tf.x: " << tf._xyz._x  << std::endl;
-    // std::cout << "tf.y: " << tf._xyz._y  << std::endl;
-    // std::cout << "tf.z: " << tf._xyz._z  << std::endl;
-    // std::cout << "tf.roll: " << tf._rpy._roll  << std::endl;
-    // std::cout << "tf.pitch: " << tf._rpy._pitch  << std::endl;
-    // std::cout << "tf.yaw: " << tf._rpy._yaw  << std::endl;
-
-    // 雷达到相机的固定变换
     Ten::XYZRPY wt;
-    wt._xyz._z = 1.3;
+    wt._xyz._z = 1.25;
     wt._rpy._roll = - M_PI / 2;
-    wt._rpy._pitch = M_PI / 2;
-    Eigen::Matrix4d lidar_to_camera = worldtocurrent(wt._xyz, wt._rpy);
-
-    Ten::_CAMERA_TRANSFORMATION_.camerainfo_.set_Extrinsic_Matrix(lidar_to_camera);        // 设置雷达到相机外参
+    //wt._rpy._yaw = -M_PI / 2;
+    Eigen::Matrix4d transform_matrix = worldtocurrent(wt._xyz, wt._rpy);
+    
+    Ten::_CAMERA_TRANSFORMATION_.camerainfo_.set_Extrinsic_Matrix(transform_matrix);
     Ten::_CAMERA_TRANSFORMATION_.camerainfo_.set_K(global._K);
 
-    Ten::XYZRPY world2toworld1;
-    world2toworld1._rpy._yaw = - M_PI / 2;
-    // world2toworld1._xyz._z = -0.05;
-    Ten::_CAMERA_TRANSFORMATION_.set_world2toworld1(world2toworld1);
+    std::cout << "tf.x: " << tf._xyz._x  << std::endl;
+    std::cout << "tf.y: " << tf._xyz._y  << std::endl;
+    std::cout << "tf.z: " << tf._xyz._z  << std::endl;
+
     Ten::_CAMERA_TRANSFORMATION_.set_worldtolidar(tf);
-
-    Ten::Ten_camerainfo cccc;
-    // for(int i = 0; i < 8; i++)
-    // {
-    //     std::cout << Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].x << " "<<Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].y <<" "<< Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_->points[i].z << std::endl;
-    // }
-    Eigen::Matrix4d world_to_camera = Ten::_CAMERA_TRANSFORMATION_.pcl_transform_world_to_camera(Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_, 
-            Ten::_INIT_3D_BOX_.pcl_C_plum_object_points_, Ten::_INIT_3D_BOX_.object_plum_2d_points_);
-    cccc.set_Extrinsic_Matrix(world_to_camera);
-    // std::cout <<  "cccc.rvec() : "<< cccc.rvec()  << std::endl;
-    // std::cout << "cccc.tvec() : "<<cccc.tvec()  << std::endl;
-
+    Ten::_CAMERA_TRANSFORMATION_.pcl_transform_world_to_camera(Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_, 
+    Ten::_INIT_3D_BOX_.pcl_C_plum_object_points_, Ten::_INIT_3D_BOX_.object_plum_2d_points_);
     Ten::_INIT_3D_BOX_.pcl_to_C();
 
-    int exist_boxes[12] = {1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1};
+    int exist_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
     int interested_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
+    // Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+    // Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
 
-    auto start = std::chrono::high_resolution_clock::now();
-    Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
-    Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    global.time_total += duration;
-    global.time_count += 1;
-    if (global.time_count % 10 == 0)
-    {
-        std::cout << "run set_box_lists for 10 time_count: " << global.time_total.count()  / 1000.0 << " ms" << std::endl;
-        global.time_total = std::chrono::microseconds(0);
+    // Ten::_OCCLUSION_HANDING_.set_enclosure_box_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+    // Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+
+    // global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
+    //     global._image,
+    //     Ten::_INIT_3D_BOX_.object_plum_2d_points_
+    // );
+
+    // std::string input;
+    // std::cin >> input;
+    
+    // if (input == "s")
+    // {
+    //     std::cout << "-------------------------------------------------------" << std::endl;
+    //     Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+    //     Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+
+    //     Ten::_OCCLUSION_HANDING_.save_dataset(
+    //         Ten::_INIT_3D_BOX_.box_lists_,
+    //         global._image,
+    //         {1,1,0,
+    //          1,1,0,
+    //          1,1,1,
+    //          0,1,0},
+    //         "/home/h/视频/tests"
+    //     );
+    // }
+
+    // std::cout << "atoi(global.num.c_str()) : " << std::stoi(global.num) << std::endl;
+
+    std::cout << "atoi(global.num.c_str()) : " << global.num << std::endl;
+
+    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber("/home/h/视频/tests/datasets_real");
+
+
+    static int count = 0;
+    if (count % 5 == 0)
+    { 
+        static int save_count = 1;
+        
+        std::cout << "-------------------------------------------------------" << std::endl;
+        Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+        Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+
+        Ten::_OCCLUSION_HANDING_.save_dataset(
+            Ten::_INIT_3D_BOX_.box_lists_,
+            global._image,
+            data[atoi(global.num.c_str()) - 1],
+            "/home/h/视频/datasets_real",
+            save_count_sta + save_count
+        );
+        save_count += 1;
+
     }
+    count += 1;
 
-    global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
-        global._image,
-        Ten::_INIT_3D_BOX_.object_plum_2d_points_
-    );
 
-    Ten::_OCCLUSION_HANDING_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_,global.debug_best_roi_image);
+
+    // Ten::_OCCLUSION_HANDING_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_,global.debug_best_roi_image);
 
 }
 
@@ -192,14 +375,20 @@ void worker_task2(ros::NodeHandle nh)
         sl.sleep();
     }
 }
-
+void worker_task3(ros::NodeHandle nh)
+{
+    ros::Publisher cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+    Ten::_MOVE_CONTROLLER_.move_controller2(cmd_vel_pub);
+}
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "zbuffer_func_node");
     ros::NodeHandle nh;
+
     std::vector<std::thread> workers;
     workers.emplace_back(worker_task1, nh);
     workers.emplace_back(worker_task2, nh);
+    workers.emplace_back(worker_task3, nh);
 
     image_transport::ImageTransport it(nh);
     image_transport::Publisher debug_image_pub = it.advertise("pub_image_topic", 2);
@@ -215,9 +404,11 @@ int main(int argc, char **argv)
             msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_image).toImageMsg();
             roi_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_best_roi_image).toImageMsg();
         }
+        
         debug_image_pub.publish(msg);
         debug_roi_pub.publish(roi_msg);
         zbuffer_process();
+
         // std::cout << "publish success" << std::endl;
         rate.sleep();
     }

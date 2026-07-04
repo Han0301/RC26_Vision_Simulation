@@ -91,8 +91,17 @@ rosrun 3dto2d hsv_detection_node
 - **编译优化** 启用 `-O2 -Wall -Wextra` 编译选项
 - 优化 `world_to_camera` 外参转换精度
 
-### world_ws10 — 数据集录制版
-*待更新*
+### world_ws10 — 数据集自动录制版
+- **新增** `change_debug_to_data.py`: 调试图像转数据集脚本，支持自动标注
+- **新增** `random_create_map.py`: 随机地图生成器，用于训练数据增强
+- **新增** `move_controller.cpp/h`: 运动控制模块，支持自动遍历采集
+- **新增** `zbuffer_func.launch`: Z-buffer 功能的便捷启动文件
+- **新增** `label_100.txt`/`label_150.txt`: 标注数据文件
+- **新增** `map1_add`: 扩展地图配置文件
+- **移除** `camera_calibration.cpp`（整合至其他模块）
+- **移除** `debug/` 调试图像目录（不再需要手动调试）
+- **优化** `occlusion_handing` 遮挡参数的标定精度
+- **优化** `method_math` 数学工具函数性能
 
 ### world_ws11
 *待更新*

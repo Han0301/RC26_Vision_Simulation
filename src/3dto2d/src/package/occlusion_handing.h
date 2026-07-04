@@ -5,6 +5,8 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/Image.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
 #include <Eigen/Geometry>
 #include <nav_msgs/Odometry.h>
 #include <algorithm>
@@ -21,40 +23,21 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/transforms.h>
-#include <cfloat>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
-#include <Eigen/Core>
-#include <random>   // 现代随机数库（C++11及以上）
-#include <stdexcept> // 用于异常处理
+#include <regex>
+#include <dirent.h>   // Linux目录遍历
+#include <sys/stat.h> // Linux文件状态
+#include <geometry_msgs/Twist.h>
+#include <filesystem>
 namespace Ten{
 
-#define L_ 1.2f                 // 台阶长度
-#define H_ 0.2f                 // 台阶高度
-#define lx1_ 0.425f             // 台阶到方块的间距
-#define ly1_ 0.425f             // 台阶到方块的间距
-#define lh_ 0.35f               // 方块的长度
-#define X_ 3.2f                 // 初始位置到梅花林1号位置边角的x轴距离
-#define Y_ -1.2f                // 初始位置到梅花林1号位置边角的y轴距离
-#define LIDAR_HEIGHT_ 0         // 雷达的高度 
-#define box_half_length_ 0.175  // 方块长度的一半
-#define step_half_length_ 0.6   //台阶水平边长的一半
-// #define offset_x_ 0.06          // x方向上的偏移量
-// #define offset_y_ 0.06            // y方向上的偏移量
-// #define offset_z_ 0.06             // z方向上的偏移量
-#define offset_x_ 0.00          // x方向上的偏移量
-#define offset_y_ 0.00            // y方向上的偏移量
-#define offset_z_ 0.00             // z方向上的偏移量
-
-struct box{
-    int idx;                             // 表示位置的下标索引
-    cv::Mat roi_image;                   // 裁剪出来的roi图片
-    int cls = 0;                             // 识别类别
-    float confidence = 0.0f;                // 自信度
-    int zbuffer_flag = 0;                    // zbuffer是否处理的标志位， 0 表示未处理， 1 表示已处理， -1 表示异常
-    int exist_flag = -1;                      // 是否筛空的标志位， 0 表示空， 1 表示有方块， -1 表示未处理
-    int roi_valid_flag = 0;                   // 用于表示当前的roi 图像是否有效
-};
+#define _L_ 1.2
+#define _H_ 0.2
+#define _ly1_ 0.425
+#define _ly2_ 0.775
+#define _lx1_ 0.425
+#define _lh_ 0.35 
+#define _X_  3.17             
+#define _Y_  1.2  
 
 struct surface_2d_point {        
     int idx;                       // 对应方块索引
@@ -63,6 +46,17 @@ struct surface_2d_point {
     cv::Point2f right_down;        // 右下2D点
     cv::Point2f left_down;         // 左下2D点
     float surface_depth;           // 该表面的深度值
+};
+
+struct box{
+    int idx;                             // 表示位置的下标索引
+    cv::Mat roi_image;                   // 裁剪出来的roi图片
+    int cls = 0;                             // 识别类别
+    float confidence = 0.0f;                // 自信度
+    int zbuffer_flag = 0;                    // zbuffer是否处理的标志位， 0 表示未处理， 1 表示已处理， -1 表示异常
+    int exist_flag = -1;                      // 是否筛空的标志位， 0 表示空， 1 表示有方块， -1 表示未处理
+    int point_size = 0;
+    int roi_valid_flag = 0;
 };
 
 // 初始化方块和台阶的3d点，2d点的 结构体
@@ -99,38 +93,66 @@ struct init_3d_box{
         }
 
         // 初始化 W_object_plum_points_
-        float arr_[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
+        float _arr[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                // 方块8个3D点
-                W_object_plum_points_[(j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);                
-                W_object_plum_points_[(j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);                
-                W_object_plum_points_[(j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));
+                W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));
+                W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));                
+                W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));                
+                W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
             }
         } 
+
+        // 1.2 包围盒
+        // for(int j = 0; j < 4; j++) {
+        //     for(int i = 0; i < 3; i++) {
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ , _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ , _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ , _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ , _arr[j*3+i]));
+        //     }
+        // } 
+
+        // 0.6 包围盒
+        // for(int j = 0; j < 4; j++) {
+        //     for(int i = 0; i < 3; i++) {
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.3, _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.9, _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.9, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + 0.3), _Y_ + i*_L_  + 0.3, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.3, _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.9, _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.9, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + 0.9), _Y_ + i*_L_  + 0.3, _arr[j*3+i]));
+        //     }
+        // } 
+
+        // 台阶8个3D点（先颠倒X/Y坐标，再将新X取反）
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                // 台阶8个3D点
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  0 + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      0 + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, arr_[i*3+j] + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, 0 + offset_z_);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, 0));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, 0));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, 0 ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, 0));
             }
-        }    
+        }  
 
         // 初始化 LM_object_plum_points_，C_object_plum_points_，pcl_LM_plum_object_points_，pcl_C_plum_object_points_
         for(int i = 0; i < 96 * 2; i++){
             //减雷达高度
-            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z - LIDAR_HEIGHT_);
+            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
             C_object_plum_points_[i]  = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
             pcl::PointXYZ tmp;
             tmp.x = LM_object_plum_points_[i].x;
@@ -186,16 +208,12 @@ public:
      * @param C_object_plum_points 相机坐标系下，方块和台阶的3D点
      * @param object_plum_2d_points  像素坐标系下，方块和台阶的2d点
      * @param box_lists 方块的列表
-     * @param debug_mode 是否启用调试模式， 默认是false
-     * @param scale 缩放比例
      */
     void set_box_lists_(
-        const cv::Mat& input_image,     
+        const cv::Mat& image,     
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
-        std::vector<box>& box_lists,
-        bool debug_mode = false,
-        float scale = 0.65f);
+        std::vector<box>& box_lists);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -208,6 +226,7 @@ public:
         cv::Mat image,
         const std::vector<cv::Point2f>& object_plum_2d_points_
     );
+    
     /**
      * @brief 拼接调试图像
      * @param box_lists  方块的列表，std::vector<box>
@@ -217,6 +236,16 @@ public:
         std::vector<Ten::box>box_lists,
         cv::Mat& debug_best_roi_image);
 
+    void save_dataset(
+        const std::vector<Ten::box>& box_lists,
+        const cv::Mat& image,
+        const std::vector<int> labels,
+        const std::string& save_dir,
+        int count_
+    );
+int getMaxImageNumber(const std::string &dir_path);
+std::string get_txt_flag(std::string map_file_path);
+void write_txt_flag(std::string current_flag, std::string map_file_path);
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
@@ -252,6 +281,7 @@ private:
             float right_depth = cal_distance(C_object_plum_points[j + i + 1], C_object_plum_points[j + i + 5], C_object_plum_points[j + i + 6],C_object_plum_points[j + i + 2]);
             float up_depth = cal_distance(C_object_plum_points[j + i + 4], C_object_plum_points[j + i + 5], C_object_plum_points[j + i + 1],C_object_plum_points[j + i]);
             float down_depth = cal_distance(C_object_plum_points[j + i + 6], C_object_plum_points[j + i + 7], C_object_plum_points[j + i + 3],C_object_plum_points[j + i + 2]);
+            
             if (front_depth < back_depth)
             {
                 surface_2d.push_back({idx, object_plum_2d_points[j + i], object_plum_2d_points[j + i + 1], object_plum_2d_points[j + i + 2],object_plum_2d_points[j + i + 3],front_depth});
@@ -354,65 +384,115 @@ private:
     bool is_update_image(
         const std::vector<box>& box_lists,
         const std::vector<cv::Point2f>& valid_max_points,
+        const int exist_boxes[12],
         const int interested_boxes[12],
         const int i
     )
     {
         bool update_image = true;
-        if (valid_max_points.empty() || valid_max_points.size() <= 800) {
+        if (valid_max_points.empty() || valid_max_points.size() <= 600) {
+            std::cout << "🤡in func: set_box_lists_ 4.2, box idx= " <<  i / 3 + 1 <<  ", valid_max_points is empty or size() = " <<  valid_max_points.size()<< " < 600, skip crop ROI" << std::endl;
+            // box_lists[i].zbuffer_flag = -1; // 标记异常
             update_image = false;
         }
-        else if (interested_boxes[i / 3] == 0)
+        else if (!(exist_boxes[i / 3] != 0 && interested_boxes[i / 3] == 1))
         {
+            std::cout << "🤡in func: set_box_lists_ 4.2,!(exist_boxes[i] != 0 && interested_boxes[i] == 1), skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         }
         else if (box_lists[i / 3].zbuffer_flag == -1)
         {
+            std::cout << "🤡in func: set_box_lists_ 4.2,box_lists[i].zbuffer_flag == -1, skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         } 
         return update_image;
     }
 
+/**
+ * @brief 纯标准库生成JSON文件，三个输入均为int型vector
+ * @param json_path JSON文件完整保存路径（保证有效，如./data/result.json）
+ * @param point_size int型vector：点尺寸数据
+ * @param labels int型vector：标签数据（替代原string）
+ * @param roi_valid_mask int型vector：ROI掩码数据（替代原bool，如0/1表示false/true）
+ * @return true 保存成功，false 保存失败
+ */
+bool create_json_file(const std::string& json_path,
+                      const std::vector<int>& point_size,
+                      const std::vector<int>& labels,
+                      const std::vector<int>& roi_valid_mask) {
+    // ========== 第一步：提取并创建JSON父目录 ==========
+    std::filesystem::path full_path(json_path);
+    std::filesystem::path parent_dir = full_path.parent_path();
 
-// 安全生成掩码（功能、逻辑、输出完全和之前一致）
-cv::Mat createSurfaceMask(const surface_2d_point& surf, const cv::Size& img_size) {
-    cv::Mat mask = cv::Mat::zeros(img_size, CV_8UC1);
-    if (img_size.width <= 0 || img_size.height <= 0) {
-        return mask;
-    }
-
-    const int cols = img_size.width;
-    const int rows = img_size.height;
-
-    auto clampPoint = [&](float x, float y) -> cv::Point {
-        int cx = cvRound(x);
-        int cy = cvRound(y);
-        cx = std::max(0, std::min(cx, cols - 1));
-        cy = std::max(0, std::min(cy, rows - 1));
-        return cv::Point(cx, cy);
-    };
-
-    std::vector<cv::Point> contour = {
-        clampPoint(surf.left_up.x,    surf.left_up.y),
-        clampPoint(surf.right_up.x,   surf.right_up.y),
-        clampPoint(surf.right_down.x, surf.right_down.y),
-        clampPoint(surf.left_down.x,  surf.left_down.y)
-    };
-
-    if (contour.size() >= 3) {
-        bool valid = false;
-        for (size_t i = 1; i < contour.size(); i++) {
-            if (contour[i] != contour[0]) {
-                valid = true;
-                break;
+    try {
+        if (!std::filesystem::exists(parent_dir)) {
+            if (!std::filesystem::create_directories(parent_dir)) {
+                std::cerr << "创建JSON父目录失败：" << parent_dir << std::endl;
+                return false;
             }
+            std::cout << "JSON父目录创建成功：" << parent_dir << std::endl;
+        } else if (!std::filesystem::is_directory(parent_dir)) {
+            std::cerr << "错误：" << parent_dir << " 不是有效目录（被文件占用）" << std::endl;
+            return false;
         }
-        if (valid) {
-            std::vector<std::vector<cv::Point>> contours = {contour};
-            cv::fillPoly(mask, contours, cv::Scalar(255));
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "目录操作异常：" << e.what() << std::endl;
+        return false;
+    }
+
+    // ========== 第二步：校验vector长度（可选，提示非12长度） ==========
+    if (point_size.size() != 12 || labels.size() != 12 || roi_valid_mask.size() != 12) {
+        std::cerr << "警告：传入的int型vector长度非12！" << std::endl;
+        std::cerr << "point_size长度：" << point_size.size() << std::endl;
+        std::cerr << "labels长度：" << labels.size() << std::endl;
+        std::cerr << "roi_valid_mask长度：" << roi_valid_mask.size() << std::endl;
+    }
+
+    // ========== 第三步：拼接JSON字符串（全int型适配） ==========
+    std::string json_str = "{\n";
+    // 拼接point_size（int型，无引号）
+    json_str += "    \"point_size\": [";
+    for (std::size_t i = 0; i < point_size.size(); ++i) {
+        json_str += std::to_string(point_size[i]);
+        if (i != point_size.size() - 1) {
+            json_str += ", ";
         }
     }
-    return mask;
+    json_str += "],\n";
+
+    // 拼接labels（改为int型，无引号，替代原string）
+    json_str += "    \"labels\": [";
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+        json_str += std::to_string(labels[i]); // 直接转int为字符串，无双引号
+        if (i != labels.size() - 1) {
+            json_str += ", ";
+        }
+    }
+    json_str += "],\n";
+
+    // 拼接roi_valid_mask（改为int型，替代原bool，如0=false/1=true）
+    json_str += "    \"roi_valid_mask\": [";
+    for (std::size_t i = 0; i < roi_valid_mask.size(); ++i) {
+        json_str += std::to_string(roi_valid_mask[i]); // 直接转int为字符串
+        if (i != roi_valid_mask.size() - 1) {
+            json_str += ", ";
+        }
+    }
+    json_str += "]\n";
+    json_str += "}";
+
+    // ========== 第四步：写入JSON文件 ==========
+    std::ofstream json_file(full_path, std::ios::out | std::ios::trunc);
+    if (!json_file.is_open()) {
+        std::cerr << "无法打开JSON文件：" << full_path << std::endl;
+        return false;
+    }
+    json_file << json_str;
+    json_file.close();
+
+    std::cout << "JSON文件保存成功：" << full_path << std::endl;
+    std::cout << "\n生成的JSON内容：\n" << json_str << std::endl;
+    return true;
 }
 
 };

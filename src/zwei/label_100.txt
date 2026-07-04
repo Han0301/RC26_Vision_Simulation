@@ -1,0 +1,201 @@
+请输入要生成的文件数量n: 100
+第1组随机数：(24, 0, 0, 1, 1, 6, 14, 0, 0, 12, 11, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_1.urdf
+第2组随机数：(1, 3, 0, 25, 0, 1, 15, 1, 0, 8, 0, 4)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_2.urdf
+第3组随机数：(12, 0, 6, 1, 11, 0, 0, 25, 0, 1, 1, 14)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_3.urdf
+第4组随机数：(0, 1, 1, 26, 0, 0, 11, 1, 12, 15, 7, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_4.urdf
+第5组随机数：(0, 15, 0, 1, 16, 0, 9, 1, 0, 1, 22, 2)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_5.urdf
+第6组随机数：(0, 30, 1, 1, 16, 0, 4, 0, 9, 5, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_6.urdf
+第7组随机数：(1, 0, 19, 7, 0, 0, 16, 1, 6, 1, 0, 13)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_7.urdf
+第8组随机数：(0, 9, 0, 8, 4, 1, 31, 1, 0, 0, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_8.urdf
+第9组随机数：(8, 0, 14, 1, 0, 0, 16, 0, 21, 1, 1, 5)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_9.urdf
+第10组随机数：(20, 0, 1, 15, 1, 1, 13, 0, 0, 12, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_10.urdf
+第11组随机数：(10, 11, 1, 0, 1, 0, 0, 7, 5, 0, 1, 24)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_11.urdf
+第12组随机数：(1, 1, 0, 16, 24, 5, 0, 11, 0, 9, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_12.urdf
+第13组随机数：(2, 0, 1, 1, 0, 0, 7, 3, 12, 23, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_13.urdf
+第14组随机数：(1, 0, 0, 0, 0, 16, 4, 1, 23, 12, 1, 6)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_14.urdf
+第15组随机数：(0, 0, 10, 13, 1, 0, 18, 1, 0, 1, 3, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_15.urdf
+第16组随机数：(1, 1, 0, 1, 6, 9, 21, 5, 16, 0, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_16.urdf
+第17组随机数：(0, 0, 15, 14, 1, 1, 0, 6, 29, 10, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_17.urdf
+第18组随机数：(14, 0, 1, 0, 1, 0, 30, 0, 16, 5, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_18.urdf
+第19组随机数：(1, 1, 0, 1, 0, 6, 31, 0, 4, 3, 7, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_19.urdf
+第20组随机数：(1, 14, 1, 1, 5, 12, 1, 0, 0, 25, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_20.urdf
+第21组随机数：(0, 27, 13, 1, 0, 1, 0, 0, 8, 4, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_21.urdf
+第22组随机数：(0, 15, 1, 2, 23, 0, 1, 1, 0, 8, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_22.urdf
+第23组随机数：(16, 8, 1, 1, 0, 31, 12, 0, 2, 0, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_23.urdf
+第24组随机数：(0, 30, 0, 1, 12, 1, 1, 16, 10, 0, 0, 13)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_24.urdf
+第25组随机数：(1, 27, 8, 16, 0, 14, 1, 0, 0, 4, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_25.urdf
+第26组随机数：(1, 7, 2, 0, 17, 1, 5, 0, 1, 0, 12, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_26.urdf
+第27组随机数：(0, 29, 1, 1, 10, 14, 0, 1, 1, 7, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_27.urdf
+第28组随机数：(0, 12, 1, 9, 0, 20, 10, 0, 0, 1, 14, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_28.urdf
+第29组随机数：(2, 3, 1, 0, 1, 1, 0, 19, 4, 0, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_29.urdf
+第30组随机数：(23, 1, 11, 0, 0, 14, 0, 1, 1, 0, 5, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_30.urdf
+第31组随机数：(1, 10, 0, 7, 0, 1, 0, 1, 15, 30, 2, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_31.urdf
+第32组随机数：(11, 1, 5, 14, 1, 0, 0, 0, 1, 0, 1, 18)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_32.urdf
+第33组随机数：(1, 1, 29, 11, 0, 1, 0, 0, 3, 1, 0, 7)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_33.urdf
+第34组随机数：(8, 0, 2, 1, 7, 0, 1, 0, 1, 19, 16, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_34.urdf
+第35组随机数：(16, 0, 0, 29, 1, 1, 6, 0, 9, 0, 1, 3)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_35.urdf
+第36组随机数：(0, 2, 9, 0, 15, 21, 1, 7, 0, 1, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_36.urdf
+第37组随机数：(0, 1, 24, 7, 1, 1, 8, 0, 0, 0, 10, 4)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_37.urdf
+第38组随机数：(0, 7, 12, 11, 0, 22, 16, 1, 1, 0, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_38.urdf
+第39组随机数：(1, 1, 14, 11, 1, 6, 0, 0, 15, 19, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_39.urdf
+第40组随机数：(12, 30, 15, 0, 5, 2, 0, 0, 0, 1, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_40.urdf
+第41组随机数：(1, 1, 0, 3, 13, 1, 20, 0, 0, 7, 16, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_41.urdf
+第42组随机数：(6, 0, 0, 0, 11, 1, 16, 0, 22, 3, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_42.urdf
+第43组随机数：(6, 0, 1, 0, 0, 22, 11, 1, 9, 1, 14, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_43.urdf
+第44组随机数：(1, 0, 0, 25, 16, 0, 14, 0, 1, 1, 6, 13)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_44.urdf
+第45组随机数：(0, 7, 1, 13, 1, 0, 12, 10, 22, 0, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_45.urdf
+第46组随机数：(4, 0, 1, 14, 6, 0, 28, 0, 1, 10, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_46.urdf
+第47组随机数：(8, 1, 9, 22, 0, 15, 0, 1, 0, 16, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_47.urdf
+第48组随机数：(8, 0, 1, 1, 1, 26, 0, 1, 10, 0, 15, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_48.urdf
+第49组随机数：(4, 0, 12, 0, 0, 0, 1, 1, 17, 13, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_49.urdf
+第50组随机数：(0, 1, 0, 26, 0, 1, 15, 1, 4, 0, 3, 16)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_50.urdf
+第51组随机数：(1, 7, 1, 0, 1, 0, 0, 8, 27, 0, 3, 10)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_51.urdf
+第52组随机数：(12, 6, 1, 0, 28, 1, 0, 1, 2, 0, 13, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_52.urdf
+第53组随机数：(1, 12, 0, 1, 1, 7, 0, 0, 0, 11, 20, 10)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_53.urdf
+第54组随机数：(14, 0, 1, 0, 11, 5, 0, 25, 1, 1, 0, 7)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_54.urdf
+第55组随机数：(13, 1, 0, 4, 0, 23, 0, 1, 5, 1, 2, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_55.urdf
+第56组随机数：(8, 12, 0, 1, 0, 24, 0, 7, 11, 0, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_56.urdf
+第57组随机数：(1, 26, 0, 13, 0, 0, 6, 0, 1, 1, 16, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_57.urdf
+第58组随机数：(15, 0, 1, 13, 0, 16, 14, 1, 28, 1, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_58.urdf
+第59组随机数：(1, 1, 5, 0, 0, 1, 0, 0, 15, 20, 1, 13)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_59.urdf
+第60组随机数：(0, 24, 3, 2, 0, 0, 9, 11, 1, 1, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_60.urdf
+第61组随机数：(0, 0, 3, 14, 1, 2, 0, 0, 9, 1, 18, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_61.urdf
+第62组随机数：(11, 1, 4, 16, 14, 0, 0, 0, 1, 1, 0, 29)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_62.urdf
+第63组随机数：(0, 2, 0, 1, 0, 14, 1, 0, 8, 1, 6, 27)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_63.urdf
+第64组随机数：(0, 0, 7, 1, 12, 1, 3, 0, 1, 0, 6, 19)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_64.urdf
+第65组随机数：(1, 28, 0, 1, 0, 15, 3, 13, 0, 8, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_65.urdf
+第66组随机数：(1, 16, 1, 0, 13, 0, 1, 31, 0, 1, 9, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_66.urdf
+第67组随机数：(0, 1, 4, 10, 27, 0, 15, 5, 0, 1, 1, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_67.urdf
+第68组随机数：(1, 0, 0, 0, 0, 4, 1, 6, 1, 16, 21, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_68.urdf
+第69组随机数：(0, 29, 1, 1, 0, 0, 14, 5, 4, 1, 0, 15)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_69.urdf
+第70组随机数：(1, 30, 16, 5, 1, 1, 0, 0, 0, 3, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_70.urdf
+第71组随机数：(12, 30, 1, 16, 6, 1, 0, 1, 13, 0, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_71.urdf
+第72组随机数：(0, 5, 0, 1, 10, 1, 0, 0, 1, 8, 14, 25)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_72.urdf
+第73组随机数：(8, 1, 2, 28, 0, 1, 1, 0, 1, 0, 6, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_73.urdf
+第74组随机数：(6, 10, 0, 0, 0, 0, 8, 1, 7, 31, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_74.urdf
+第75组随机数：(1, 1, 13, 0, 2, 0, 10, 0, 23, 0, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_75.urdf
+第76组随机数：(1, 2, 0, 0, 1, 14, 0, 12, 13, 1, 28, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_76.urdf
+第77组随机数：(1, 9, 0, 0, 1, 11, 29, 12, 0, 0, 1, 10)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_77.urdf
+第78组随机数：(0, 12, 0, 0, 15, 0, 8, 25, 1, 1, 16, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_78.urdf
+第79组随机数：(1, 8, 5, 6, 0, 0, 0, 3, 0, 1, 1, 18)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_79.urdf
+第80组随机数：(1, 1, 0, 22, 0, 15, 1, 0, 7, 0, 1, 2)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_80.urdf
+第81组随机数：(7, 1, 0, 21, 0, 1, 0, 0, 1, 6, 9, 3)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_81.urdf
+第82组随机数：(1, 8, 0, 7, 0, 0, 5, 0, 28, 1, 12, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_82.urdf
+第83组随机数：(1, 0, 1, 11, 6, 0, 24, 9, 12, 0, 0, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_83.urdf
+第84组随机数：(23, 15, 0, 0, 1, 16, 0, 0, 1, 2, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_84.urdf
+第85组随机数：(0, 1, 9, 4, 6, 1, 8, 22, 0, 1, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_85.urdf
+第86组随机数：(26, 0, 1, 5, 1, 0, 9, 1, 8, 3, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_86.urdf
+第87组随机数：(0, 1, 14, 28, 0, 1, 0, 1, 16, 3, 4, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_87.urdf
+第88组随机数：(0, 0, 14, 1, 1, 2, 8, 9, 1, 0, 26, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_88.urdf
+第89组随机数：(1, 1, 0, 0, 5, 0, 8, 10, 1, 15, 31, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_89.urdf
+第90组随机数：(0, 7, 1, 0, 14, 1, 3, 0, 1, 26, 10, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_90.urdf
+第91组随机数：(0, 12, 1, 9, 1, 2, 1, 0, 0, 29, 4, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_91.urdf
+第92组随机数：(17, 0, 0, 1, 1, 8, 16, 1, 9, 0, 0, 5)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_92.urdf
+第93组随机数：(2, 3, 1, 0, 14, 0, 0, 5, 28, 0, 1, 1)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_93.urdf
+第94组随机数：(1, 22, 8, 0, 0, 6, 1, 1, 0, 16, 0, 11)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_94.urdf
+第95组随机数：(5, 1, 1, 1, 0, 26, 11, 9, 0, 0, 0, 3)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_95.urdf
+第96组随机数：(1, 1, 10, 0, 0, 1, 9, 1, 31, 0, 11, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_96.urdf
+第97组随机数：(8, 0, 0, 0, 2, 15, 1, 1, 1, 0, 10, 24)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_97.urdf
+第98组随机数：(1, 10, 0, 1, 0, 18, 1, 0, 14, 2, 16, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_98.urdf
+第99组随机数：(11, 1, 0, 0, 1, 13, 16, 6, 1, 22, 0, 0)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_99.urdf
+第100组随机数：(0, 1, 12, 1, 11, 0, 0, 1, 1, 16, 0, 30)
+URDF文件已生成：/home/h/RC2026/world_ws10/src/zwei/map1_add/urdf/map_100.urdf
