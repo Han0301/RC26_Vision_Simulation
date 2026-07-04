@@ -160,9 +160,8 @@ target_link_libraries(zbuffer_func_node
 
 set(TEN_SRC_FILES
   src/package/method_math.cpp
-  src/package/zbuffer_simplify.cpp
+  src/package/occlusion_handing.cpp
   src/package/world_to_camera.cpp
-  src/package/debug_hsv.cpp
   # 其他Ten相关的.cpp文件都要加在这里
 )
 

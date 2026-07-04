@@ -29,9 +29,8 @@
 #include <unordered_set>
 
 #include "package/method_math.h"
-#include "package/zbuffer_simplify.h"     
+#include "package/occlusion_handing.h"     
 #include "package/world_to_camera.h"  
-#include "package/debug_hsv.h"
 
 
 struct G
@@ -105,21 +104,21 @@ void zbuffer_process()
 
     int exist_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
     int interested_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
-    Ten::_ZBUFFER_SIMPLIFY_.set_exist_boxes(exist_boxes);
-    Ten::_ZBUFFER_SIMPLIFY_.set_interested_boxes(interested_boxes);
+    Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
+    Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
-    Ten::_ZBUFFER_SIMPLIFY_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
-        Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+    Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+    Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
 
-    global.debug_image = Ten::_ZBUFFER_SIMPLIFY_.update_debug_image(
+    global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
         global._image,
         Ten::_INIT_3D_BOX_.object_plum_2d_points_
     );
 
-    Ten::_ZBUFFER_SIMPLIFY_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,global.debug_best_roi_image);
+    Ten::_OCCLUSION_HANDING_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_,global.debug_best_roi_image);
 
-    std::string img_dir = "/home/h/rc26_log/log/2026_1_12/23/image/image1";
-    Ten::_DEBUG_HSV_.read_jpgs_by_idx_order(img_dir,Ten::_INIT_3D_BOX_.box_lists_);   
+    // std::string img_dir = "/home/h/rc26_log/log/2026_1_12/23/image/image1";
+    // Ten::_DEBUG_HSV_.read_jpgs_by_idx_order(img_dir,Ten::_INIT_3D_BOX_.box_lists_);   
 
     static int image_num = 0;
     std::vector<cv::Mat> hist_lists_36;
@@ -153,8 +152,8 @@ void zbuffer_process()
     // 通过众数比较分类
     //Ten::_ZBUFFER_SIMPLIFY_.set_hsv_mode(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_);
     
-    Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_stand(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
-    std::cout << "set_hsv_topn_stand(5): " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[0] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[1] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[2] << "  "<< std::endl;
+    // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_stand(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
+    // std::cout << "set_hsv_topn_stand(5): " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[0] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[1] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[2] << "  "<< std::endl;
     
     // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_stand(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,10);
     // std::cout << "set_hsv_topn_stand(10): " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[0] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[1] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[2] << "  "<< std::endl;
@@ -169,8 +168,8 @@ void zbuffer_process()
     // }
 
     //Ten::_ZBUFFER_SIMPLIFY_.set_hsv_top_n(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
-    Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_score(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
-    std::cout << "---------🎃❌🌚" << std::endl;
+    // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_score(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
+    // std::cout << "---------🎃❌🌚" << std::endl;
     // std::cout << "-----use top5--------------" << std::endl;
     // for(int i = 0;i < Ten::_INIT_3D_BOX_.score_lists_.size(); i ++)
     // {
