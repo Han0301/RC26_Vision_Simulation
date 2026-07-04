@@ -31,6 +31,8 @@
 #include "package/method_math.h"
 #include "package/zbuffer_simplify.h"     
 #include "package/world_to_camera.h"  
+#include "package/debug_hsv.h"
+
 
 struct G
 {
@@ -101,16 +103,159 @@ void zbuffer_process()
     Ten::_INIT_3D_BOX_.pcl_C_plum_object_points_, Ten::_INIT_3D_BOX_.object_plum_2d_points_);
     Ten::_INIT_3D_BOX_.pcl_to_C();
 
+    int exist_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+    int interested_boxes[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+    Ten::_ZBUFFER_SIMPLIFY_.set_exist_boxes(exist_boxes);
+    Ten::_ZBUFFER_SIMPLIFY_.set_interested_boxes(interested_boxes);
+
     Ten::_ZBUFFER_SIMPLIFY_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
         Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
 
-    
     global.debug_image = Ten::_ZBUFFER_SIMPLIFY_.update_debug_image(
         global._image,
         Ten::_INIT_3D_BOX_.object_plum_2d_points_
     );
 
-    Ten::_ZBUFFER_SIMPLIFY_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_, global.debug_best_roi_image);
+    Ten::_ZBUFFER_SIMPLIFY_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,global.debug_best_roi_image);
+
+    std::string img_dir = "/home/h/rc26_log/log/2026_1_12/23/image/image1";
+    Ten::_DEBUG_HSV_.read_jpgs_by_idx_order(img_dir,Ten::_INIT_3D_BOX_.box_lists_);   
+
+    static int image_num = 0;
+    std::vector<cv::Mat> hist_lists_36;
+    for (int i = 0; i < Ten::_INIT_3D_BOX_.box_lists_.size(); i ++)
+    {
+        //保存直方图
+        // cv::imshow("img",Ten::_INIT_3D_BOX_.box_lists_[i].roi_image);
+        // cv::waitKey(0);
+        //std::vector<cv::Mat> hist_lists = Ten::_DEBUG_HSV_.set_hsv_hist(Ten::_INIT_3D_BOX_.box_lists_[i].roi_image);
+        //std::vector<int> hsv_mode_honye= Ten::_DEBUG_HSV_.bgr_color_analysis(Ten::_INIT_3D_BOX_.box_lists_[i].roi_image);
+        //std::cout << "hsv_houye: " << hsv_mode_honye[0]<<"  "  <<  hsv_mode_honye[1]<<"  " << hsv_mode_honye[2]<<"  "<< std::endl; 
+        // std::string save_path = "/home/h/RC2026/merge_ws20/log/2026_1_9/14/image/image4/" + std::to_string(image_num) + "_hist" + std::to_string(i + 1) + ".jpg";
+        // Ten::_DEBUG_HSV_.save_hsv_hist_visualization(hist_lists,save_path,90,128,128);
+        // std::string image_save_path = "/home/h/RC2026/world_ws7/src/3dto2d/debug/" + std::to_string(image_num) + "_img" + std::to_string(i + 1) + ".jpg";
+
+        // 保存图像
+        // bool success = cv::imwrite(image_save_path,Ten::_INIT_3D_BOX_.box_lists_[i].roi_image);
+        // if (!success)
+        // {
+        //     std::cout << "图像保存失败： " << save_path << std::endl;
+        // }
+        // std::tuple<int,int,int>hsv_mode = Ten::_DEBUG_HSV_.get_hist_mode(hist_lists);
+        // std::cout << "idx: " << i + 1 << ", hsv_mode: " << std::get<0>(hsv_mode) << "  "<<std::get<1>(hsv_mode) << "  " << std::get<2>(hsv_mode) << "  ";
+    // hist_lists_36.push_back(hist_lists[0]);
+    // hist_lists_36.push_back(hist_lists[1]);
+    // hist_lists_36.push_back(hist_lists[2]);
+    }
+    image_num += 1;
+
+
+    // 通过众数比较分类
+    //Ten::_ZBUFFER_SIMPLIFY_.set_hsv_mode(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_);
+    
+    Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_stand(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
+    std::cout << "set_hsv_topn_stand(5): " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[0] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[1] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[2] << "  "<< std::endl;
+    
+    // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_stand(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,10);
+    // std::cout << "set_hsv_topn_stand(10): " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[0] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[1] << "  " << Ten::_ZBUFFER_SIMPLIFY_.get_standard_hsv_()[2] << "  "<< std::endl;
+
+    // std::cout << "-----use mode--------------" << std::endl;
+    // for(int i = 0;i < Ten::_INIT_3D_BOX_.score_lists_.size(); i ++)
+    // {
+    //     std::cout << "idx : "<< Ten::_INIT_3D_BOX_.score_lists_[i].idx << ",  hsv_mode: " << std::get<0>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_mode) << " " <<  std::get<1>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_mode) << " " << std::get<2>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_mode) << std::endl; 
+    //     std::cout <<"      " << "score: " << Ten::_INIT_3D_BOX_.score_lists_[i].hsv_score << std::endl; 
+
+    //     std::cout << " " << std::endl;
+    // }
+
+    //Ten::_ZBUFFER_SIMPLIFY_.set_hsv_top_n(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
+    Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_score(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,5);
+    std::cout << "---------🎃❌🌚" << std::endl;
+    // std::cout << "-----use top5--------------" << std::endl;
+    // for(int i = 0;i < Ten::_INIT_3D_BOX_.score_lists_.size(); i ++)
+    // {
+    //     std::cout << "idx : "<< Ten::_INIT_3D_BOX_.score_lists_[i].idx << ", score: " << Ten::_INIT_3D_BOX_.score_lists_[i].hsv_score << std::endl; 
+
+    //     if (Ten::_INIT_3D_BOX_.score_lists_[i].hsv_score  < 0){
+    //         continue;
+    //     }
+    //     for(int j = 0; j < 5; j++ )
+    //     {
+    //         std::cout << "    j:"<< j << std::endl;
+    //         std::cout << "   top_n_h: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].count
+    //                 << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].degree_of_promacy << std::endl;
+    //         std::cout << "   top_n_s: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].count
+    //                 << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].degree_of_promacy << std::endl;
+    //         std::cout << "   top_n_v: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].count
+    //                 << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].degree_of_promacy << std::endl;
+    //     }
+    //     std::cout << " " << std::endl;
+    // }
+
+    // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_topn_score(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_,10);
+    // std::cout << "-----use top10--------------" << std::endl;
+    // for(int i = 0;i < Ten::_INIT_3D_BOX_.score_lists_.size(); i ++)
+    // {
+    //     std::cout << "idx : "<< Ten::_INIT_3D_BOX_.score_lists_[i].idx << ", score: " << Ten::_INIT_3D_BOX_.score_lists_[i].hsv_score << std::endl; 
+
+    //     // for(int j = 0; j < 5; j++ )
+    //     // {
+    //     //     std::cout << "    j:"<< j << std::endl;
+    //     //     std::cout << "   top_n_h: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].count
+    //     //             << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_h[j].degree_of_promacy << std::endl;
+    //     //     std::cout << "   top_n_s: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].count
+    //     //             << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_s[j].degree_of_promacy << std::endl;
+    //     //     std::cout << "   top_n_v: "<<Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].position << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].count
+    //     //             << ", " << Ten::_INIT_3D_BOX_.score_lists_[i].top_n_v[j].degree_of_promacy << std::endl;
+    //     // }
+    //     std::cout << " " << std::endl;
+    // }
+
+
+    // std::cout <<std::endl;
+
+    // 通过平均数比较
+    // Ten::_ZBUFFER_SIMPLIFY_.set_hsv_average(Ten::_INIT_3D_BOX_.box_lists_, Ten::_INIT_3D_BOX_.score_lists_);
+    // for(int i = 0;i < Ten::_INIT_3D_BOX_.score_lists_.size(); i ++)
+    // {
+    //     std::cout << "idx : "<<i + 1 << ",  hsv_average: " << std::get<0>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_average) << " " <<  std::get<1>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_average) << " " << std::get<2>(Ten::_INIT_3D_BOX_.score_lists_[i].hsv_average) << std::endl; 
+    //     //std::cout << "         "  << Ten::_INIT_3D_BOX_.score_lists_[i].hsv_score << std::endl; 
+    // }
+    
+    // 直方图的相似性比较分类
+    // std::vector<Ten::HistCompareResult> sim_compare_;
+    // for (int i = 0;i < 12; i++)
+    // {
+    //     std::vector<cv::Mat> hist_lists_i= Ten::_DEBUG_HSV_.set_hsv_hist(Ten::_INIT_3D_BOX_.box_lists_[i].roi_image);
+    //     for (int j = i + 1;j < 12; j ++)
+    //     {
+    //         std::vector<cv::Mat> hist_lists_j = Ten::_DEBUG_HSV_.set_hsv_hist(Ten::_INIT_3D_BOX_.box_lists_[j].roi_image);
+    //         //std::cout << "i + 1: " << i + 1 << ", j + 1: " << j + 1 << std::endl;
+    //         double h_sim,s_sim,v_sim,hsv_sim;
+    //         Ten::_DEBUG_HSV_.compare_hsv_hist(hist_lists_i,hist_lists_j,h_sim,s_sim,v_sim,hsv_sim,cv::HISTCMP_BHATTACHARYYA);
+    //         sim_compare_.push_back({
+    //             i + 1,
+    //             j + 1,
+    //             h_sim,
+    //             s_sim,
+    //             v_sim,
+    //             hsv_sim
+    //         });
+    //     }
+    // }
+
+    // Ten::_DEBUG_HSV_.cluster_box_images(sim_compare_);
+
+    // 相似性比较打印
+    //std::string txt_path = "/home/h/RC2026/world_ws7/src/3dto2d/debug/" + std::to_string(image_num) + "_compare" + ".txt";
+    //bool save_txt = Ten::_DEBUG_HSV_.batch_compare_hist_and_save(txt_path,hist_lists_36,cv::HISTCMP_BHATTACHARYYA,0.3,0.3,0.4);
+    // if (!save_txt)
+    // {
+    //     std::cout << "直方图比较结束，txt保存失败： " << txt_path << std::endl;
+    // }
+
+
+
 }
 
 // 回调函数1：处理/robot_pose话题

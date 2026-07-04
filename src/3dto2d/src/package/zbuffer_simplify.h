@@ -54,12 +54,25 @@ struct box{
     int exist_flag = -1;                      // 是否筛空的标志位， 0 表示空， 1 表示有方块， -1 表示未处理
 };
 
+struct HistValue {
+    int position;  // 直方图的位置（对应H/S/V的取值）
+    int count;     // 该位置的像素数量
+    float degree_of_promacy;        // 首位度
+};
+
 // 计算筛空的指标
 struct score{
     int idx;
     std::tuple<int,int,int> hsv_mode;
+    std::tuple<int,int,int> hsv_average;
+    std::vector<HistValue> top_n_h;
+    std::vector<HistValue> top_n_s;
+    std::vector<HistValue> top_n_v;
     float hsv_score;
+    int valid_count = 0;                      // 有效像素数量
+    bool is_managed = true;     
 };
+
 
 // 初始化方块和台阶的3d点，2d点的 结构体
 struct init_3d_box{
@@ -195,8 +208,10 @@ struct init_3d_box{
 
 };
 
+
 class Ten_zbuffer_simplify{
 public:
+
 /**
  * @brief 由用户自己设置存在方块的数组, 方便调试
  * @param exist_boxes_ 输入 int， 12 数组， 1 表示存在， 0 表示不存在， -1 表示异常
@@ -206,6 +221,7 @@ void set_exist_boxes(int exist_boxes[12])
     std::lock_guard<std::mutex> lock(mtx_);
     for(int i = 0; i < 12; i++){exist_boxes_[i] = exist_boxes[i];}
 };
+
 /**
  * @brief 由用户自己设置感兴趣的方块的数组（zbuffer矩阵将仅更新 有方块 且 感兴趣的 位置处的方块深度信息）, 方便调试
  * @param exist_boxes_ 输入 int， 12 数组， 1 表示存在， 0 表示不存在， -1 表示异常
@@ -236,6 +252,7 @@ void set_box_lists_(
  */
 void set_debug_roi_image(
     std::vector<Ten::box>box_lists,
+    std::vector<Ten::score> score_lists,
     cv::Mat& debug_best_roi_image);
 
 /**
@@ -250,24 +267,25 @@ cv::Mat update_debug_image(
     const std::vector<cv::Point2f>& object_plum_2d_points_
 );
 /**
- * @brief 通过图像来 判断 是否有方块
- * @param box_lists 方块的列表，std::vector<box>
- * @param score_lists 用于计算筛空的得分
- */
-void set_HSV_exist_boxes_(std::vector<box>& box_lists,std::vector<score>& score_lists);
-/**
- * @brief 设置标准 hsv 值
- * @param box_lists 方块的列表，std::vector<box>
- * @param score_lists 用于筛空的得分列表
- */
-void set_standard_hsv_(std::vector<box>& box_lists,std::vector<score>&score_lists);
-/**
  * @brief 由用户自己输入标准的hsv 值
  * @param stand_hsv 输入int 型容器，size为3，表示3个通道的标准hsv值
  */
 void set_stand_hsv_(std::vector<int>stand_hsv){
     standard_hsv_ = stand_hsv;
 };
+
+std::vector<int> get_standard_hsv_()
+{
+    return standard_hsv_;
+}
+
+void set_hsv_top_n(std::vector<box>& box_lists, std::vector<score>& score_lists,int top_n,int min_manage_points = 600);
+
+void set_hsv_topn_stand(std::vector<box>& box_lists, std::vector<score>& score_lists,int top_n,int min_manage_points = 600);
+
+void set_hsv_topn_score(std::vector<box>& box_lists, std::vector<score>& score_lists,int top_n,int min_manage_points = 600);
+
+
 private:
 int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};             // 由用户自己设置存在方块的数组
 int interested_boxes_[12] = {1,1,1,1,1,1,1,1,1,1,1,1};        // 由用户自己设置感兴趣的方块的数组
@@ -275,63 +293,41 @@ std::vector<int> standard_hsv_ = {0,0,0};
 
 mutable std::mutex mtx_;
 
-// 功能函数1
-int cal_single_standard_hsv(std::vector<int>single_channel_result, int min_total_single = INT_MAX){
-    int result_channel = -1;
-    for(int i = 0;i < single_channel_result.size(); ++i){
-        int candidate = single_channel_result[i];
-        int total_diff = 0;
-        // 计算每一个值与其他所有值的总差值
-        for(int j = 0;j < single_channel_result.size(); ++j){      
-            total_diff += std::abs(candidate - single_channel_result[j]);
-        }
-        if(total_diff < min_total_single){
-            min_total_single = total_diff;
-            result_channel = candidate;
-        }
-    }
-    if (result_channel == -1){
-        ROS_WARN("cal_single_standard_hsv: result_channel = -1 !");
-    }
-    return result_channel;
-};
-
-// 功能函数2 set_hsv_mode: 用于更新score_lists_中的hsv众数
-void set_hsv_mode(std::vector<box>& box_lists, std::vector<score>& score_lists){
-    for (const auto& box: box_lists){
-        cv::Mat hsv_image;
-        cv::cvtColor(box.roi_image, hsv_image, cv::COLOR_BGR2HSV);
-        //  填充HSV直方图
-        cv::Mat h_hist = cv::Mat::zeros(1, 180, CV_32S);     // HSV直方图
-        cv::Mat s_hist = cv::Mat::zeros(1, 255, CV_32S);
-        cv::Mat v_hist = cv::Mat::zeros(1, 255, CV_32S);
-
-        for(int i = 0; i < hsv_image.cols; i ++){
-            for(int j = 0;j < hsv_image.rows;j++){
-                cv::Vec3b hsv = hsv_image.at<cv::Vec3b>(i,j);
-                if(hsv[2] == 0)continue;
-                h_hist.at<int>(0, hsv[0])++;
-                s_hist.at<int>(0, hsv[1])++;
-                v_hist.at<int>(0, hsv[2])++;
-            }
-        }
-        // 2.6 计算众数
-        cv::Point h_max_loc, s_max_loc, v_max_loc;
-        cv::minMaxLoc(h_hist, nullptr, nullptr, nullptr, &h_max_loc);
-        cv::minMaxLoc(s_hist, nullptr, nullptr, nullptr, &s_max_loc);
-        cv::minMaxLoc(v_hist, nullptr, nullptr, nullptr, &v_max_loc);
-        // 2.7 填充idx_hsv_map，构建下标和对应的hsv众数
-        int h_mode = h_max_loc.x;
-        int s_mode = s_max_loc.x;
-        int v_mode = v_max_loc.x;
-        score_lists[box.idx - 1].hsv_mode = {h_mode, s_mode, v_mode};
-    }
-}
-
 inline float cal_distance (const cv::Point3f& p) {
     return sqrt(powf(p.x, 2) + powf(p.y, 2) + powf(p.z, 2));
 }
 
+std::vector<HistValue> getTopNValues(const cv::Mat& hist, int top_n) {
+    std::vector<HistValue> hist_values;
+    
+    // 1. 提取直方图所有非零值（零值无统计意义）
+    for (int col = 0; col < hist.cols; col++) {
+        int count = hist.at<int>(0, col);
+        if (count > 0) { // 只保留有像素的位置
+            hist_values.push_back({col, count});
+        }
+    }
+    
+    // 2. 按数量降序排序（数量多的在前）
+    std::sort(hist_values.begin(), hist_values.end(), 
+        [](const HistValue& a, const HistValue& b) {
+            return a.count > b.count;
+        });
+    
+    // 3. 截取前N个（如果总数不足N，取全部）
+    if (hist_values.size() > top_n) {
+        hist_values.resize(top_n);
+    }
+    
+    // 4. 填充 首位度
+    float first_count = static_cast<float>(hist_values[0].count);
+    for (int i = 0; i < top_n; i ++)
+    {   
+        float now_count = static_cast<float>(hist_values[i].count);
+        hist_values[i].degree_of_promacy = now_count / first_count;
+    }
+    return hist_values;
+}
 };
 
 

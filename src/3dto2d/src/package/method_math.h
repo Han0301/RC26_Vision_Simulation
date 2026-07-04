@@ -179,7 +179,7 @@ namespace Ten
     }
 
 
-    #define EPS 1e-6
+    //#define EPS 1e-6
     /**
      * @brief Eigen旋转矩阵转欧拉角（Z-Y-X 顺序：Yaw-Pitch-Roll）
      * @param R 3x3 Eigen旋转矩阵
