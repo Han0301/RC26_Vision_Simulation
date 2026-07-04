@@ -1,27 +1,36 @@
 # RC26 Vision Simulation — World Workspace
 
-> 机器人竞赛视觉仿真工作区，基于 ROS Noetic，用于 3D 感知、2D 映射与机械臂视觉抓取。
+> 机器人竞赛视觉仿真工作区 · ROS Noetic · Z-buffer 感知管线 · 数据集自动录制
 
 ## 项目概述
 
-本项目是 RC26 机器人竞赛的视觉仿真系统，包含以下核心功能包：
+本项目是 RC26 机器人竞赛的**视觉感知与数据集录制**工作区，核心是基于 **Z-buffer 的 3D→2D 映射遮挡处理管线**，用于仿真环境中机械臂视觉抓取。
+
+### 核心功能包
 
 | 包名 | 功能 |
 |------|------|
-| `3dto2d` | 3D 空间到 2D 图像的关键点映射、Z-buffer 遮挡处理、HSV 目标检测 |
-| `rc_msgs` | 自定义 ROS 消息定义 |
-| `wpr_simulation` | WPR 机器人仿真（传感器、控制、导航） |
-| `zwei` | Zwei 机器人模型与仿真配置 |
+| `3dto2d` | **核心感知算法**：Z-buffer 遮挡处理、HSV 目标检测、相机标定、PID 运动控制 |
+| `rc_msgs` | 自定义 ROS 消息（感知结果、控制指令） |
+| `wpr_simulation` | WPR 机器人仿真环境（传感器、控制、导航、机械臂） |
+| `zwei` | Zwei 机器人模型 + **地图数据集**（`map1_add/` 含数百张地图配置） |
+
+### 配套工具脚本
+
+| 脚本 | 用途 |
+|------|------|
+| `random_create_map.py` | 随机生成地图配置（12 点位规则），用于训练数据增强 |
+| `change_data.py` | URDF 日志 → C++ 二维 vector 格式转换 |
+| `change_debug_to_data.py` | 调试图像自动裁剪、重命名并整理为数据集 |
 
 ## 使用方法
 
 ### 环境要求
 
-- Ubuntu 20.04 + ROS Noetic
-- OpenCV + PCL (点云库)
-
+- **Ubuntu 20.04** + ROS Noetic (Neotic Ninjemys)
+- OpenCV (`cv_bridge`)、PCL (`pcl_ros`)、Eigen3
+- 依赖安装：
 ```bash
-# 安装依赖
 sudo apt install ros-noetic-desktop-full
 sudo apt install ros-noetic-vision-msgs ros-noetic-pcl-ros
 ```
@@ -29,25 +38,74 @@ sudo apt install ros-noetic-vision-msgs ros-noetic-pcl-ros
 ### 编译
 
 ```bash
-cd world_ws
+cd /path/to/world_ws
 catkin_make
 # 或使用 catkin build
+source devel/setup.bash
 ```
 
-### 运行示例
+### 运行感知管线
+
+**主入口 — Z-buffer 感知节点**（推荐使用 launch 文件启动）：
 
 ```bash
-source devel/setup.bash
-
-# 启动 WPR 仿真环境
-roslaunch wpr_simulation wpb_sim.launch
-
-# 启动 Z-buffer 感知节点
-rosrun 3dto2d zbuffer_func_node
-
-# HSV 颜色检测
-rosrun 3dto2d hsv_detection_node
+roslaunch 3dto2d zbuffer_func.launch
 ```
+
+launch 文件可配置参数：
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `save_root_path` | 数据集录制保存根目录 | `/home/awwsome/datasets/juanZhou_gazebo20/` |
+| `map_file_path` | 地图文件路径 | `$(find zwei)/map1_add/` |
+| `txt_root_name` | 地图文件名前缀 | `map_` |
+| `image_root_name` | 图像目录名 | `juanZhou_gazebo20` |
+
+也可直接运行节点：
+
+```bash
+rosrun 3dto2d zbuffer_func_node
+```
+
+### 仿真环境
+
+WPR 机器人仿真提供多种场景启动方式：
+
+```bash
+# RoboCup 标准赛场
+roslaunch wpr_simulation wpb_stage_robocup.launch
+
+# 走廊环境
+roslaunch wpr_simulation wpb_stage_corridor.launch
+
+# 简单桌面测试
+roslaunch wpr_simulation wpb_table.launch
+
+# 查看完整场景列表：
+ls src/wpr_simulation/launch/
+```
+
+### 数据工具
+
+```bash
+# 随机生成地图（用于训练数据增强）
+python3 src/random_create_map.py
+
+# URDF 日志转 C++ 格式
+python3 src/change_data.py <input_log> <output_txt>
+
+# 调试图像转数据集
+python3 src/change_debug_to_data.py
+```
+
+## 稳定版本
+
+| 版本 | 标签 | 描述 |
+|------|------|------|
+| **world_ws9** | `world_ws/v9.0` | 旗舰版 — 完整的 Z-buffer 感知管线 + 相机标定 |
+| **world_ws13** | `world_ws/v13.0` | 数据集录制版 — BaseMoveController + PID 控制 |
+| **world_ws13.5** | `world_ws/v13.5` | 最终版 — 大规模地图数据更新与最终优化 |
+
+> 从 [GitHub Releases](https://github.com/Han0301/RC26_Vision_Simulation/releases) 下载对应版本的源码压缩包。
 
 ## 版本迭代日志
 
