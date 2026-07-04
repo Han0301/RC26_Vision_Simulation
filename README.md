@@ -103,8 +103,17 @@ rosrun 3dto2d hsv_detection_node
 - **优化** `occlusion_handing` 遮挡参数的标定精度
 - **优化** `method_math` 数学工具函数性能
 
-### world_ws11
-*待更新*
+### world_ws11 — 偏差与边缘处理引入版
+- **新增** `deviation_handing.cpp/h`: 偏差处理模块，补偿检测偏差
+- **新增** `edge_handing.cpp`: 边缘检测处理，提升边缘定位精度
+- **新增** `hsv_handing.cpp/h`: HSV 颜色检测独立模块
+- **新增** `zbuffer_test1.launch`: 测试用启动文件
+- **新增** `debug/` 调试图像目录
+- **新增** 顶层 `CMakeLists.txt` 工作区构建配置
+- **移除** `move_controller` 运动控制模块（迁移至其他工作区）
+- **移除** 数据集相关脚本（`change_debug_to_data.py`, `random_create_map.py`）
+- **优化** `occlusion_handing` 遮挡处理算法
+- **优化** `zbuffer_func` 主节点性能
 
 ### world_ws12
 *待更新*

@@ -1,0 +1,8 @@
+<launch>
+    <param name="start_idx" value="1450" type="int"/>
+    <param name="save_path" value="/home/awwsome/datasets/juanZhou_gazebo/" type="string"/>
+    <param name="label_name" value="9" type="string"/>
+
+    <node pkg="3dto2d" type="zbuffer_package_test1_node" name="zbuffer_package_test1" output="screen"/>
+
+</launch>

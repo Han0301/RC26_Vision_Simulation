@@ -28,6 +28,7 @@
 #include <sys/stat.h> // Linux文件状态
 #include <geometry_msgs/Twist.h>
 #include <filesystem>
+
 namespace Ten{
 
 #define _L_ 1.2
@@ -39,6 +40,7 @@ namespace Ten{
 #define _X_  3.17             
 #define _Y_  1.2  
 
+// 表示每个面的框的 2d点信息
 struct surface_2d_point {        
     int idx;                       // 对应方块索引
     cv::Point2f left_up;           // 左上2D点
@@ -59,6 +61,13 @@ struct box{
     int roi_valid_flag = 0;
 };
 
+// 表示每个位置的方块存在情况
+struct han {
+    float invalid;      // 无效值
+    float valid_empty;  // 有效但空值
+    float valid_exist;  // 有效且存在值
+};
+
 // 初始化方块和台阶的3d点，2d点的 结构体
 struct init_3d_box{
     // 1 3D点集合
@@ -72,6 +81,8 @@ struct init_3d_box{
     std::vector<cv::Point2f> object_plum_2d_points_;
 
     std::vector<box> box_lists_;
+
+    cv::Mat object_zbuffer;
 
     // 无参构造函数
     init_3d_box()
@@ -213,7 +224,8 @@ public:
         const cv::Mat& image,     
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
-        std::vector<box>& box_lists);
+        std::vector<box>& box_lists,
+        cv::Mat& object_zbuffer);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -236,16 +248,6 @@ public:
         std::vector<Ten::box>box_lists,
         cv::Mat& debug_best_roi_image);
 
-    void save_dataset(
-        const std::vector<Ten::box>& box_lists,
-        const cv::Mat& image,
-        const std::vector<int> labels,
-        const std::string& save_dir,
-        int count_
-    );
-int getMaxImageNumber(const std::string &dir_path);
-std::string get_txt_flag(std::string map_file_path);
-void write_txt_flag(std::string current_flag, std::string map_file_path);
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
@@ -407,93 +409,6 @@ private:
         } 
         return update_image;
     }
-
-/**
- * @brief 纯标准库生成JSON文件，三个输入均为int型vector
- * @param json_path JSON文件完整保存路径（保证有效，如./data/result.json）
- * @param point_size int型vector：点尺寸数据
- * @param labels int型vector：标签数据（替代原string）
- * @param roi_valid_mask int型vector：ROI掩码数据（替代原bool，如0/1表示false/true）
- * @return true 保存成功，false 保存失败
- */
-bool create_json_file(const std::string& json_path,
-                      const std::vector<int>& point_size,
-                      const std::vector<int>& labels,
-                      const std::vector<int>& roi_valid_mask) {
-    // ========== 第一步：提取并创建JSON父目录 ==========
-    std::filesystem::path full_path(json_path);
-    std::filesystem::path parent_dir = full_path.parent_path();
-
-    try {
-        if (!std::filesystem::exists(parent_dir)) {
-            if (!std::filesystem::create_directories(parent_dir)) {
-                std::cerr << "创建JSON父目录失败：" << parent_dir << std::endl;
-                return false;
-            }
-            std::cout << "JSON父目录创建成功：" << parent_dir << std::endl;
-        } else if (!std::filesystem::is_directory(parent_dir)) {
-            std::cerr << "错误：" << parent_dir << " 不是有效目录（被文件占用）" << std::endl;
-            return false;
-        }
-    } catch (const std::filesystem::filesystem_error& e) {
-        std::cerr << "目录操作异常：" << e.what() << std::endl;
-        return false;
-    }
-
-    // ========== 第二步：校验vector长度（可选，提示非12长度） ==========
-    if (point_size.size() != 12 || labels.size() != 12 || roi_valid_mask.size() != 12) {
-        std::cerr << "警告：传入的int型vector长度非12！" << std::endl;
-        std::cerr << "point_size长度：" << point_size.size() << std::endl;
-        std::cerr << "labels长度：" << labels.size() << std::endl;
-        std::cerr << "roi_valid_mask长度：" << roi_valid_mask.size() << std::endl;
-    }
-
-    // ========== 第三步：拼接JSON字符串（全int型适配） ==========
-    std::string json_str = "{\n";
-    // 拼接point_size（int型，无引号）
-    json_str += "    \"point_size\": [";
-    for (std::size_t i = 0; i < point_size.size(); ++i) {
-        json_str += std::to_string(point_size[i]);
-        if (i != point_size.size() - 1) {
-            json_str += ", ";
-        }
-    }
-    json_str += "],\n";
-
-    // 拼接labels（改为int型，无引号，替代原string）
-    json_str += "    \"labels\": [";
-    for (std::size_t i = 0; i < labels.size(); ++i) {
-        json_str += std::to_string(labels[i]); // 直接转int为字符串，无双引号
-        if (i != labels.size() - 1) {
-            json_str += ", ";
-        }
-    }
-    json_str += "],\n";
-
-    // 拼接roi_valid_mask（改为int型，替代原bool，如0=false/1=true）
-    json_str += "    \"roi_valid_mask\": [";
-    for (std::size_t i = 0; i < roi_valid_mask.size(); ++i) {
-        json_str += std::to_string(roi_valid_mask[i]); // 直接转int为字符串
-        if (i != roi_valid_mask.size() - 1) {
-            json_str += ", ";
-        }
-    }
-    json_str += "]\n";
-    json_str += "}";
-
-    // ========== 第四步：写入JSON文件 ==========
-    std::ofstream json_file(full_path, std::ios::out | std::ios::trunc);
-    if (!json_file.is_open()) {
-        std::cerr << "无法打开JSON文件：" << full_path << std::endl;
-        return false;
-    }
-    json_file << json_str;
-    json_file.close();
-
-    std::cout << "JSON文件保存成功：" << full_path << std::endl;
-    std::cout << "\n生成的JSON内容：\n" << json_str << std::endl;
-    return true;
-}
 
 };
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
