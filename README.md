@@ -127,8 +127,15 @@ rosrun 3dto2d hsv_detection_node
 - **优化** `occlusion_handing` 遮挡处理
 - **优化** `zbuffer_func` 主节点融合运动控制
 
-### world_ws13
-*待更新*
+### world_ws13 — BaseMoveController 重构版
+- **新增** `BaseMoveController.cpp/h`: 重构基础运动控制器，替代旧版 basemove2
+- **新增** `change_data.py`: 数据格式转换与处理脚本
+- **新增** `01_400.txt`/`label_400.txt`: 更新标注数据集（400 级）
+- **移除** `basemove2.cpp`: 被 BaseMoveController 替代
+- **移除** `label_100.txt`/`label_150.txt`: 旧版标注数据
+- **优化** `occlusion_handing` 遮挡处理算法精度
+- **优化** `PID.cpp` 控制器参数
+- **优化** `zbuffer_func` 主节点性能与稳定性
 
 ### world_ws13.5
 *待更新*

@@ -164,7 +164,7 @@ set(TEN_SRC_FILES
   src/package/move_controller.cpp
   src/package/occlusion_handing.cpp
   src/package/PID.cpp
-  src/package/basemove2.cpp
+  src/package/BaseMoveController.cpp
   # 其他Ten相关的.cpp文件都要加在这里
 )
 

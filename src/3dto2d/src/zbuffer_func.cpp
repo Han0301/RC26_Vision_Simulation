@@ -31,7 +31,7 @@
 #include "package/method_math.h"
 #include "package/occlusion_handing.h"     
 #include "package/world_to_camera.h"  
-#include "package/move_controller.h"
+#include "package/BaseMoveController.h"
 
 struct G
 {
@@ -44,22 +44,25 @@ struct G
             0, 0, 1);
         // 2. 畸变系数（假设零畸变）
         _distCoeffs = cv::Mat::zeros(5, 1, CV_64F);
-        num = Ten::_OCCLUSION_HANDING_.get_txt_flag("/home/h/RC2026/world_ws12/src/zwei/map1_add");
-        Ten::_OCCLUSION_HANDING_.write_txt_flag(num, "/home/h/RC2026/world_ws12/src/zwei/map1_add");
-        // num += 1;
 
+        // 设置工作空间目录 -> 清空txt文档 -> 确定sh文件内容 —> 开始自动录制数据集
+        workspace_path = "/home/h/RC2026/world_ws13";
+        datasets_path = "/home/h/视频/Datasets_new";
+
+        num = Ten::_OCCLUSION_HANDING_.get_txt_flag(workspace_path + "/src/zwei/map1_add");
+        Ten::_OCCLUSION_HANDING_.write_txt_flag(num, workspace_path + "/src/zwei/map1_add");
     }
+    std::string workspace_path;
+    std::string datasets_path;
 
     std::vector<Ten::box> box_lists;
-
-    bool is_move = true;
 
     cv::Mat _K;
     cv::Mat _distCoeffs;
 
     cv::Mat _image;
     cv::Mat debug_image;
-    cv::Mat debug_best_roi_image = cv::Mat::zeros(480, 640, CV_8UC3);;
+    cv::Mat debug_best_roi_image = cv::Mat::zeros(480, 640, CV_8UC3);
     std::mutex _mtx_image;
 
     image_transport::Publisher zbuffer_pub;
@@ -70,116 +73,12 @@ struct G
     bool pose_updated = false;              // 位姿更新标记
     bool image_updated = false;             // 图像更新标记
     std::mutex data_mutex;                  // 互斥锁，防止数据竞争
+
+    std::vector<cv::Point2d> save_datasets_pos;     // 记录保存图像时点的位置， 以防止在同一个位置 重复拍摄
 }global;
 
 void zbuffer_process()
 {
-
-// 100行×12列二值化数组（0不变，非0→1）
-std::vector<std::vector<int>> data = {
-{1,0,1,1,0,1,0,1,1,1,1,0},
-{},
-{1,0,1,1,0,1,1,1,1,0,1,0},
-{1,1,0,1,1,0,1,1,0,1,0,1},
-{1,1,1,1,0,0,0,1,0,1,1,1},
-{1,1,0,1,0,1,0,0,1,1,1,1},
-{1,1,1,1,1,0,0,1,0,1,0,1},
-{0,1,1,1,1,0,0,1,1,1,0,1},
-{1,1,0,0,1,1,1,0,0,1,1,1},
-{1,1,1,1,1,0,1,1,0,0,0,1},
-{0,1,0,0,1,1,0,1,1,1,1,1},
-{1,0,1,0,1,0,1,1,1,1,0,1},
-{1,0,1,1,0,1,1,1,1,0,1,0},
-{0,1,1,0,1,1,1,1,0,1,1,0},
-{0,1,0,0,1,1,1,1,1,1,0,1},
-{1,0,1,0,0,1,1,1,1,0,1,1},
-{1,0,0,0,1,1,1,1,1,0,1,1},
-{1,1,1,0,0,1,0,1,1,1,0,1},
-{1,0,1,1,1,1,0,0,0,1,1,1},
-{0,0,1,1,1,0,1,1,1,1,1,0},
-{1,1,1,0,1,1,1,0,1,1,0,0},
-{1,0,1,1,1,1,0,1,1,0,0,1},
-{1,1,1,0,1,1,1,0,0,1,1,0},
-{0,0,1,1,1,1,1,0,1,1,1,0},
-{0,0,1,1,1,0,1,1,0,1,1,1},
-{1,0,1,1,0,1,1,0,0,1,1,1},
-{1,0,1,0,1,1,0,0,1,1,1,1},
-{0,1,0,0,1,1,1,1,1,1,1,0},
-{1,0,1,1,0,0,1,1,1,1,1,0},
-{1,1,0,1,0,1,1,1,1,1,0,0},
-{1,0,1,1,1,0,1,1,0,1,0,1},
-{0,1,1,1,1,1,1,1,1,0,0,0},
-{0,1,1,0,0,1,1,1,1,0,1,1},
-{0,1,1,0,1,1,1,1,0,1,1,0},
-{1,0,0,0,1,1,1,1,1,1,1,0},
-{0,1,1,1,1,1,0,1,0,1,1,0},
-{1,1,1,1,0,1,1,1,0,1,0,0},
-{0,1,1,0,1,1,1,0,1,1,0,1},
-{1,1,1,0,1,1,0,0,1,0,1,1},
-{1,0,1,0,1,1,0,1,0,1,1,1},
-{1,1,0,1,1,0,1,1,0,1,1,0},
-{1,0,0,1,0,0,1,1,1,1,1,1},
-{1,1,0,0,0,1,1,1,1,1,1,0},
-{0,0,1,1,0,1,1,0,1,1,1,1},
-{1,1,0,0,0,1,1,1,1,1,0,1},
-{1,1,1,1,0,0,1,0,0,1,1,1},
-{1,1,1,0,0,1,0,1,1,0,1,1},
-{1,1,1,0,0,1,1,1,0,0,1,1},
-{1,1,1,1,0,1,1,0,0,0,1,1},
-{1,1,1,0,0,0,1,1,1,1,0,1},
-{1,1,1,1,0,0,1,1,1,0,1,0},
-{0,1,1,1,1,1,0,0,1,0,1,1},
-{0,1,0,1,0,1,1,1,0,1,1,1},
-{0,1,1,0,1,1,0,1,1,0,1,1},
-{1,0,1,1,0,1,1,1,0,0,1,1},
-{1,1,0,1,1,1,0,1,0,0,1,1},
-{1,0,1,1,1,0,0,1,1,0,1,1},
-{0,0,1,0,1,1,1,0,1,1,1,1},
-{1,0,1,0,1,1,1,0,0,1,1,1},
-{1,0,1,0,1,1,0,1,1,0,1,1},
-{0,1,0,1,1,1,1,0,1,1,0,1},
-{1,1,1,0,1,0,0,1,1,0,1,1},
-{1,1,1,0,0,0,0,1,1,1,1,1},
-{1,0,1,1,0,1,1,1,0,1,0,1},
-{0,0,1,0,1,1,1,1,0,1,1,1},
-{1,1,1,0,0,0,1,0,1,1,1,1},
-{1,0,0,1,1,1,1,1,0,1,0,1},
-{0,0,0,1,1,1,0,1,1,1,1,1},
-{1,1,0,1,1,1,0,1,1,1,0,0},
-{0,1,0,1,1,0,1,0,1,1,1,1},
-{1,0,0,1,1,0,1,1,1,0,1,1},
-{0,1,1,1,0,0,1,1,1,1,0,1},
-{1,1,1,0,1,1,0,1,0,0,1,1},
-{1,1,1,1,1,1,0,0,0,0,1,1},
-{1,1,1,0,1,0,0,0,1,1,1,1},
-{1,0,0,1,1,0,1,1,1,1,1,0},
-{1,1,0,1,1,1,1,1,0,1,0,0},
-{1,1,1,0,1,1,1,0,0,0,1,1},
-{0,1,1,1,1,1,1,0,1,1,0,0},
-{0,1,0,1,1,0,1,0,1,1,1,1},
-{0,1,0,1,1,1,0,1,1,1,1,0},
-{1,1,1,0,0,1,0,0,1,1,1,1},
-{1,0,1,1,0,1,1,0,1,1,1,0},
-{0,1,1,1,1,0,0,1,0,1,1,1},
-{1,1,0,1,1,0,0,1,0,1,1,1},
-{1,1,1,1,1,1,0,0,1,0,0,1},
-{0,1,1,1,1,0,0,1,0,1,1,1},
-{1,1,1,0,1,1,1,0,0,1,0,1},
-{1,0,0,0,0,1,1,1,1,1,1,1},
-{1,0,1,0,0,1,0,1,1,1,1,1},
-{1,0,1,0,1,1,0,0,1,1,1,1},
-{0,1,0,1,1,0,1,1,1,1,0,1},
-{0,1,0,0,1,1,1,1,0,1,1,1},
-{1,1,1,1,1,1,0,0,0,0,1,1},
-{1,0,1,0,1,1,0,1,0,1,1,1},
-{1,0,0,1,1,0,1,1,1,1,1,0},
-{0,0,1,1,1,1,1,1,0,1,0,1},
-{0,1,0,0,1,1,1,1,1,1,0,1},
-{0,1,0,1,1,1,1,0,0,1,1,1},
-{1,1,1,0,1,0,1,0,1,1,0,1}
-};
-
-
     if (!global.pose_updated || !global.image_updated)
     {
         ROS_DEBUG("数据未更新，跳过处理");
@@ -193,13 +92,6 @@ std::vector<std::vector<int>> data = {
         tf._xyz._z = tf._xyz._z - 0.05;
     }
 
-    // std::cout << "tf.x: " << tf._xyz._x  << std::endl;
-    // std::cout << "tf.y: " << tf._xyz._y  << std::endl;
-    // std::cout << "tf.z: " << tf._xyz._z  << std::endl;
-    // std::cout << "tf.roll: " << tf._rpy._roll  << std::endl;
-    // std::cout << "tf.pitch: " << tf._rpy._pitch  << std::endl;
-    // std::cout << "tf.yaw: " << tf._rpy._yaw  << std::endl;
-
     // 雷达到相机的固定变换
     Ten::XYZRPY wt;
     wt._xyz._z = 1.3;
@@ -212,7 +104,6 @@ std::vector<std::vector<int>> data = {
 
     Ten::XYZRPY world2toworld1;
     world2toworld1._rpy._yaw = - M_PI / 2;
-    // world2toworld1._xyz._z = -0.05;
     Ten::_CAMERA_TRANSFORMATION_.set_world2toworld1(world2toworld1);
     Ten::_CAMERA_TRANSFORMATION_.set_worldtolidar(tf);
 
@@ -221,8 +112,6 @@ std::vector<std::vector<int>> data = {
     Eigen::Matrix4d world_to_camera = Ten::_CAMERA_TRANSFORMATION_.pcl_transform_world_to_camera(Ten::_INIT_3D_BOX_.pcl_LM_plum_object_points_, 
             Ten::_INIT_3D_BOX_.pcl_C_plum_object_points_, Ten::_INIT_3D_BOX_.object_plum_2d_points_);
     cccc.set_Extrinsic_Matrix(world_to_camera);
-    // std::cout <<  "cccc.rvec() : "<< cccc.rvec()  << std::endl;
-    // std::cout << "cccc.tvec() : "<<cccc.tvec()  << std::endl;
 
     Ten::_INIT_3D_BOX_.pcl_to_C();
 
@@ -231,96 +120,45 @@ std::vector<std::vector<int>> data = {
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
-    // Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
-    // Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
+    static bool print_num = true;
+    if (print_num)
+    {
+        print_num = false;
+        std::cout << "atoi(global.num.c_str()) : " << atoi(global.num.c_str()) << std::endl;
+    }
 
-    // std::vector<cv::Mat>result = Ten::_OCCLUSION_HANDING_.loadSortedImages("/home/h/视频/real_tests/roi_2");
-
-    // for (int i = 0; i < 12; i++)
-    // {
-    //     Ten::_INIT_3D_BOX_.box_lists_[i].roi_image = result[i];
-    // }
-
-    // Ten::_OCCLUSION_HANDING_.set_enclosure_box_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
-    // Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_);
-
-    // global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
-    //     global._image,
-    //     Ten::_INIT_3D_BOX_.object_plum_2d_points_
-    // );
+    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber(global.datasets_path + "/global_images");
     
-    // std::vector<Ten::han> testContainer = {
-    //     {1.23f, 4.56f, 7.89f},    // 第一个元素
-    //     {0.0f, 99.99f, 123.45f},  // 第二个元素
-    //     {-5.6f, 0.0f, -8.9f}      // 第三个元素
-    // };
-    // Ten::_OCCLUSION_HANDING_.printHanContainer(testContainer);
-    // global.num = 22;
-    std::cout << "atoi(global.num.c_str()) : " << atoi(global.num.c_str()) - 1 << std::endl;
-    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber("/home/h/视频/global_tests_100/global_images");
+    static Ten::XYZRPY last_tf;         // 上一帧的tf
+    static Ten::XYZRPY total_tf;        // 累积的tf差值
+    bool place_update = Ten::_OCCLUSION_HANDING_.is_pos_update(tf, last_tf, total_tf);      // 判断位置是否移动到一定程度
+    bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));     // 判断是否在同一个位置 重复拍摄
 
-    static int count = 0;
-    if (count % 6 == 0)
+    static int start_update = 0;        // 起始处等5帧， 防止保存空图像
+    if (place_update && tf_update && start_update > 5)
     { 
         static int save_count = 1;
-        bool is_update = true;
+        bool is_update = true;      // set_box_lists_ 内部判断是否所有方块都在画面中
         std::cout << "-------------------------------------------------------" << std::endl;
         Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
         Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_,is_update);
         std::cout << "-------------------------------------------------------" << std::endl;
         if (is_update)
         {
+            global.save_datasets_pos.push_back(cv::Point2d(tf._xyz._x, tf._xyz._y));
             Ten::_OCCLUSION_HANDING_.save_dataset(
                 Ten::_INIT_3D_BOX_.box_lists_,
                 global._image,
-                data[atoi(global.num.c_str()) - 1],
-                "/home/h/视频/global_tests_100",
+                Ten::_OCCLUSION_HANDING_.processMapFile(global.workspace_path + "/src/zwei/map1_add/txt",atoi(global.num.c_str())),
+                global.datasets_path,
                 cccc.rvec(),
                 cccc.tvec(),
                 save_count_sta + save_count
             );
             save_count += 1;
         }
-
-        
-
-        
-    //     static int save_count_cls__ = Ten::_OCCLUSION_HANDING_.getMaxImageNumber("/home/h/视频/test_map50_cla_/images");
-    //     static int save_count_cls = 0;
-    //     for(int i = 0;i < 12;i ++)
-    //     {
-    //         int label;
-    //         if (Ten::_INIT_3D_BOX_.box_lists_[i].roi_valid_flag)
-    //         {
-    //             if (data[atoi(global.num.c_str()) - 1][i] == 0)
-    //             {
-    //                 label = 1;
-    //             }
-    //             else
-    //             {
-    //                 label = 2;
-    //             }
-    //         }
-    //         else 
-    //         {
-    //             label = 0;
-    //         }
-    //         std::string save_roi_image_path = "/home/h/视频/test_map50_cla_/images/images_" + std::to_string(save_count_cls__ + 12 * save_count_cls + i + 1) + ".png";
-    //         std::string save_txt_path = "/home/h/视频/test_map50_cla_/labels/labels_" + std::to_string(save_count_cls__ + 12 * save_count_cls + i + 1) + ".txt";
-    //         Ten::_OCCLUSION_HANDING_.save_dataset_txt(Ten::_INIT_3D_BOX_.box_lists_[i].roi_image,
-    //                                                     label,
-    //                                                     random_numbers[atoi(global.num.c_str()) - 1][i],
-    //                                                     save_txt_path,
-    //                                                     save_roi_image_path);
-    //     }
-    //     save_count_cls += 1;
     }
-    count += 1;
-
-
-
-    // Ten::_OCCLUSION_HANDING_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_,global.debug_best_roi_image);
-
+    start_update += 1;
 }
 
 // 回调函数1：处理/robot_pose话题
@@ -367,41 +205,48 @@ void worker_task2(ros::NodeHandle nh)
         sl.sleep();
     }
 }
-void worker_task3(ros::NodeHandle nh)
-{
-    ros::Publisher cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
-    Ten::_MOVE_CONTROLLER_.move_controller2(cmd_vel_pub);
-}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "zbuffer_func_node");
     ros::NodeHandle nh;
 
+    BaseMoveController move_controller(nh);
+    if (!move_controller.start()) {
+        ROS_ERROR("Failed to start BaseMoveController. Shutting down.");
+        return 1;
+    }
+    ROS_INFO("BaseMoveController started successfully.");
+    ros::Publisher cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+
     std::vector<std::thread> workers;
+    
     workers.emplace_back(worker_task1, nh);
     workers.emplace_back(worker_task2, nh);
-    // workers.emplace_back(worker_task3, nh);
 
     image_transport::ImageTransport it(nh);
-    image_transport::Publisher debug_image_pub = it.advertise("pub_image_topic", 2);
-    image_transport::Publisher debug_roi_pub = it.advertise("/zbuffer_visualization", 30);
+    // image_transport::Publisher debug_image_pub = it.advertise("pub_image_topic", 2);
+    // image_transport::Publisher debug_roi_pub = it.advertise("/zbuffer_visualization", 30);
 
     ros::Rate rate(10);
     while(ros::ok())
     {
-        sensor_msgs::ImagePtr msg;
-        sensor_msgs::ImagePtr roi_msg;
-        {
-            std::lock_guard<std::mutex> lock(global._mtx_image);
-            msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_image).toImageMsg();
-            roi_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_best_roi_image).toImageMsg();
+        if (move_controller.isCompleted()) {
+            ros::shutdown();
+            break;
         }
-        
-        debug_image_pub.publish(msg);
-        debug_roi_pub.publish(roi_msg);
-        zbuffer_process();
 
-        // std::cout << "publish success" << std::endl;
+        // sensor_msgs::ImagePtr msg;
+        // sensor_msgs::ImagePtr roi_msg;
+        // {
+        //     std::lock_guard<std::mutex> lock(global._mtx_image);
+        //     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_image).toImageMsg();
+        //     roi_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_best_roi_image).toImageMsg();
+        // }
+        
+        // debug_image_pub.publish(msg);
+        // debug_roi_pub.publish(roi_msg);
+        zbuffer_process();
         rate.sleep();
     }
 

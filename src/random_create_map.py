@@ -1809,9 +1809,9 @@ def generate_urdf_file(output_file_rootname, output_path=None, n=1, launch_path=
 if __name__ == "__main__":
     n = int(input("请输入要生成的文件数量n: "))
 
-    urdf_path = "/home/h/RC2026/world_ws12/src/zwei/map1_add/urdf"
-    launch_path = "/home/h/RC2026/world_ws12/src/zwei/map1_add/launch"
-    txt_path = "/home/h/RC2026/world_ws12/src/zwei/map1_add/txt"
+    urdf_path = "/home/h/RC2026/world_ws13/src/zwei/map1_add/urdf"
+    launch_path = "/home/h/RC2026/world_ws13/src/zwei/map1_add/launch"
+    txt_path = "/home/h/RC2026/world_ws13/src/zwei/map1_add/txt"
 
     os.makedirs(urdf_path,exist_ok=True)
     os.makedirs(launch_path, exist_ok=True)

@@ -1,7 +1,5 @@
 #include "ros/ros.h"
 
-
-
 struct PID
 {
     float last_error;
@@ -39,6 +37,16 @@ public:
         _maxOutput = abs(maxOutput);
         _integralLimit = abs(integralLimit);
         _deadband = abs(deadband);
+    }
+
+    // ===================== 【新增】适配你的PID重置函数（核心） =====================
+    void reset() {
+        _pid.integral = 0;      // 清空积分项（解决PID饱和）
+        _pid.last_error = 0;    // 重置上一帧误差
+        _pid.new_error = 0;     // 重置当前误差
+        _pid.pout = 0;
+        _pid.iout = 0;
+        _pid.dout = 0;
     }
 
     float PIDcalculate(float target, float measure, double dt)
@@ -91,62 +99,3 @@ float _kp;
 float _ki;
 float _kd;
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

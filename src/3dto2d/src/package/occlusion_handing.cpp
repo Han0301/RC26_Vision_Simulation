@@ -399,15 +399,6 @@ int Ten_occlusion_handing::getMaxImageNumber(const std::string &dir_path)
             flag_txt = std::fstream(flag_txt_path, std::ios::in | std::ios::out | std::ios::trunc);
         }
 
-        // //通过文件长度判断是否为
-        // std::streampos fileSize = flag_txt.tellg();
-        // if (fileSize == 0)
-        // {
-        //     flag_txt << "1" << std::endl;
-        //     flag_txt.close();
-        //     return "1";
-        // }
-
         std::string lastLine = "-1";
 
         std::string line;       // 存储每次读取的一行内容
@@ -460,55 +451,6 @@ int Ten_occlusion_handing::getMaxImageNumber(const std::string &dir_path)
                 }
             }
         }
-
-        // // 读取最后一行的数据
-        // // 将文件指针移动到文件末尾
-        // flag_txt.seekg(0, std::ios::end);
-        // std::streampos fileSize = flag_txt.tellg();
-
-        // // std::cout << "fileSize" << fileSize << std::endl;
-        // // std::cout << "1" << std::endl;
-
-        // // std::cout << "2" << std::endl;
-
-        // // std::cout << "pos: " << pos << std::endl;
-
-        // // 从文件末尾向前查找换行符
-        // // 如果文件无内容
-        // if (fileSize == 0)
-        // {
-        //     std::cout << "1" << std::endl;
-        //     // flag_txt.seekg(0);
-        //     // std::getline(flag_txt, lastLine);
-        //     lastLine = "0";
-        // }
-        // else if (fileSize == 2) // 只有一行
-        // {
-        //     std::cout << "2" << std::endl;
-        //     // lastLine = "1";
-        //     std::getline(flag_txt,lastLine);
-        // } // 待优化：如果不小心删掉了换行符，就会错位
-        // else
-        // {
-        //     std::cout << "3" << std::endl;
-        //     std::streampos pos = fileSize - 1;
-        //     while (pos > 0)
-        //     {
-        //         pos -= 1;
-        //         flag_txt.seekg(pos);
-        //         char c;
-        //         flag_txt.get(c);
-
-        //         if (c == '\n')
-        //         {
-        //             // 找到换行符，读取剩余内容
-        //             std::getline(flag_txt, lastLine);
-        //             break;
-        //         }
-        //     }
-        // }
-
-        // std::cout << "lastLine: " << lastLine << std::endl;
 
         std::string current_flag = std::to_string(atoi(lastLine.c_str()) + 1); // 当前序号
 
@@ -574,112 +516,67 @@ void Ten_occlusion_handing::save_dataset_txt(
     }
 }
 
-std::vector<cv::Mat> Ten_occlusion_handing::loadSortedImages(const std::string& folderPath) {
-    // 1. 检查文件夹是否存在
-    namespace fs = std::filesystem;
-    if (!fs::is_directory(folderPath)) {
-        throw std::invalid_argument("文件夹不存在: " + folderPath);
+
+std::vector<int> Ten_occlusion_handing::processMapFile(const std::string& folderPath, int index)
+{
+    std::vector<int> result;
+
+    // 1. 拼接完整文件路径：文件夹路径 + map_序号.txt
+    // 兼容路径结尾有无 / 的情况
+    std::string fullPath;
+    if (!folderPath.empty() && folderPath.back() == '/') {
+        fullPath = folderPath + "map_" + std::to_string(index) + ".txt";
+    } else {
+        fullPath = folderPath + "/map_" + std::to_string(index) + ".txt";
     }
 
-    // 定义图片后缀（可根据需要扩展，如.tiff/.gif）
-    const std::vector<std::string> imageExts = {".jpg", ".jpeg", ".png", ".bmp"};
-    // 用于临时存储：键=提取的整数，值=图片路径（确保1-12每个数对应一个路径）
-    std::vector<std::string> imgPaths(12, "");
-    // 正则表达式：匹配第一个连续的数字序列（提取文件名中的第一个整数）
-    const std::regex numRegex(R"(\d+)");
-
-    // 2. 遍历文件夹中的所有文件
-    for (const auto& entry : fs::directory_iterator(folderPath)) {
-        // 跳过目录，只处理文件
-        if (!entry.is_regular_file()) {
-            continue;
-        }
-
-        // 获取文件路径和后缀
-        const fs::path filePath = entry.path();
-        const std::string ext = filePath.extension().string();
-        // 转换为小写，避免大小写问题（如.JPG/.jpg）
-        std::string extLower = ext;
-        std::transform(extLower.begin(), extLower.end(), extLower.begin(), ::tolower);
-
-        // 3. 过滤出图片文件
-        bool isImage = false;
-        for (const auto& e : imageExts) {
-            if (extLower == e) {
-                isImage = true;
-                break;
-            }
-        }
-        if (!isImage) {
-            continue;
-        }
-
-        // 4. 提取文件名中的第一个整数
-        const std::string fileName = filePath.filename().string();
-        std::smatch match;
-        if (!std::regex_search(fileName, match, numRegex)) {
-            std::cerr << "警告：文件 " << fileName << " 中未找到整数，已跳过" << std::endl;
-            continue;
-        }
-
-        // 转换为整数并验证范围
-        int imgNum = std::stoi(match.str());
-        if (imgNum < 1 || imgNum > 12) {
-            std::cerr << "警告：文件 " << fileName << " 提取的整数 " << imgNum 
-                      << " 不在1-12范围内，已跳过" << std::endl;
-            continue;
-        }
-
-        // 检查是否重复（同一数字对应多个文件）
-        if (!imgPaths[imgNum - 1].empty()) {
-            throw std::runtime_error("发现重复整数 " + std::to_string(imgNum) + 
-                                     " 的图片：" + imgPaths[imgNum - 1] + " 和 " + fileName);
-        }
-
-        // 存储路径（imgNum-1是因为vector索引从0开始，对应1→0，12→11）
-        imgPaths[imgNum - 1] = filePath.string();
+    // 2. 打开文件
+    std::ifstream file(fullPath);
+    if (!file.is_open())
+    {
+        std::cerr << "[错误] 无法打开文件：" << fullPath << std::endl;
+        return result; // 打开失败，返回空vector
     }
 
-    // 5. 验证是否收集到12个有效路径
-    for (int i = 0; i < 12; ++i) {
-        if (imgPaths[i].empty()) {
-            throw std::runtime_error("未找到整数为 " + std::to_string(i + 1) + " 的图片");
+    // 3. 读取12个数字，严格按要求处理
+    int num;
+    for (int i = 0; i < 12; ++i)
+    {
+        // 读取失败（文件数字不足12个）
+        if (!(file >> num))
+        {
+            std::cerr << "[错误] 文件 " << fullPath << " 数字数量不足12个！" << std::endl;
+            file.close();
+            return {};
         }
+
+        // 核心处理：0不变，非0数字转为1
+        result.push_back((num == 0) ? 0 : 1);
     }
 
-    // 6. 按1-12顺序读取图片到cv::Mat容器
-    std::vector<cv::Mat> result;
-    result.reserve(12); // 预分配空间，提升性能
-    for (int i = 0; i < 12; ++i) {
-        cv::Mat img = cv::imread(imgPaths[i], cv::IMREAD_COLOR);
-        if (img.empty()) {
-            throw std::runtime_error("图片读取失败：" + imgPaths[i]);
-        }
-        result.push_back(img);
-    }
-
+    // 4. 关闭文件并返回结果
+    file.close();
     return result;
 }
 
-void Ten_occlusion_handing::printHanContainer(const std::vector<han>& hanContainer) {
-    // 打印表头，提升可读性
-    std::cout << std::fixed << std::setprecision(2);  // 浮点数保留2位小数（可按需调整）
-    std::cout << "----------------------------------------" << std::endl;
-    std::cout << "序号 | invalid | valid_empty | valid_exist" << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
+bool Ten_occlusion_handing::is_pos_update(Ten::XYZRPY& tf, Ten::XYZRPY& last_tf, Ten::XYZRPY& total_tf)
+{
+    bool place_update = false;
+    total_tf._xyz._x += std::abs(tf._xyz._x - last_tf._xyz._x);
+    total_tf._xyz._y += std::abs(tf._xyz._y - last_tf._xyz._y);
+    total_tf._rpy._yaw += std::abs(tf._rpy._yaw - last_tf._rpy._yaw);
+    last_tf._xyz._x = tf._xyz._x;
+    last_tf._xyz._y = tf._xyz._y;
+    last_tf._rpy._yaw = tf._rpy._yaw;
 
-    // 遍历容器（范围for循环，简洁且安全）
-    int index = 1;  // 序号（从1开始，符合直观习惯）
-    for (const auto& item : hanContainer) {
-        // 格式化打印每个属性，对齐输出
-        std::cout << std::setw(3) << index << " | "
-                  << std::setw(7) << item.invalid << " | "
-                  << std::setw(10) << item.valid_empty << " | "
-                  << std::setw(10) << item.valid_exist << std::endl;
-        index++;
+    if (total_tf._xyz._x >= 0.35 || total_tf._xyz._y >= 0.35 || total_tf._rpy._yaw > 0.08)
+    {
+        place_update = true;
+        total_tf._xyz._x = 0;
+        total_tf._xyz._y = 0;
+        total_tf._rpy._yaw = 0;
     }
-
-    std::cout << "----------------------------------------" << std::endl;
+    return place_update;
 }
     Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
     Ten::init_3d_box _INIT_3D_BOX_;

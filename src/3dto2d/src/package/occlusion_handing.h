@@ -28,6 +28,8 @@
 #include <sys/stat.h> // Linux文件状态
 #include <geometry_msgs/Twist.h>
 #include <filesystem>
+
+#include "method_math.h"
 namespace Ten{
 
 #define L_ 1.2f                 // 台阶长度
@@ -229,6 +231,7 @@ public:
         cv::Mat tvec,
         int count_
     );
+
 int getMaxImageNumber(const std::string &dir_path);
 std::string get_txt_flag(std::string map_file_path);
 void write_txt_flag(std::string current_flag, std::string map_file_path);
@@ -239,23 +242,47 @@ void save_dataset_txt(
     const std::string& save_txt_path,
     const std::string& save_roi_image_path
 );
-bool write_label_txt(const std::string& txt_path, int label, int cls);
-std::vector<cv::Mat> loadSortedImages(const std::string& folderPath);
 
-void printHanContainer(const std::vector<han>& hanContainer);
+bool is_pos_update(Ten::XYZRPY& tf, Ten::XYZRPY& last_tf, Ten::XYZRPY&total_tf);
+/**
+ * @brief 读取指定序号的map文件，处理数字后返回一维vector
+ * @param folderPath 文件夹路径（绝对/相对路径均可，结尾可带/可不带）
+ * @param index 文件序号（对应 map_序号.txt）
+ * @return 处理后的一维vector<int>（固定12个元素，0不变，非0=1）；异常返回空vector
+ */
+std::vector<int> processMapFile(const std::string& folderPath, int index);
 
+/**
+ * @brief 检查目标点是否与容器中所有点满足坐标差值要求
+ * @param points 容器内的点集
+ * @param target 待检查的目标点
+ * @return true: 所有点的x差>0.15且y差>0.25; false: 存在至少一个点不满足
+ */
+bool checkPointDistance(const std::vector<cv::Point2d>& points, const cv::Point2d& target) {
+    const double MIN_X_DIFF = 0.12;
+    const double MIN_Y_DIFF = 0.20;
 
-
-
-
-
-
-
+    for (const auto& pt : points) {
+        double dx = std::fabs(target.x - pt.x);
+        double dy = std::fabs(target.y - pt.y);
+        
+        // 只要有一个点不满足，直接返回false
+        if (dx <= MIN_X_DIFF && dy <= MIN_Y_DIFF) {
+            return false;
+        }
+    }
+    
+    // 所有点都满足要求
+    return true;
+}
 
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
     mutable std::mutex mtx_;
+
+    // 写文件相关功能函数： 写入txt文件（仅在 save_dataset_txt 函数中被调用）
+    bool write_label_txt(const std::string& txt_path, int label, int cls);
 
     // 功能函数1： 根据该面的四个角点 来 计算该面的平均深度(仅在 set_surface_2d_point 函数中被调用)
     float cal_distance (const cv::Point3f& p1,const cv::Point3f& p2,const cv::Point3f& p3,const cv::Point3f& p4) {
@@ -556,21 +583,8 @@ bool create_json_file(const std::string& json_path,
     return true;
 }
 
-// 测试示例（可选）
-int main() {
-    // 构造测试数据
-    std::vector<int> point_size(12, 10);
-    std::vector<int> labels(12, 1);
-    std::vector<int> roi_valid_mask(12, 0);
-    cv::Mat rvec = (cv::Mat_<float>(1, 3) << 0.1, 0.2, 0.3);
-    cv::Mat tvec = (cv::Mat_<double>(3, 1) << 1.0, 2.0, 3.0);
-
-    // 调用函数
-    create_json_file("./data/result.json", point_size, labels, roi_valid_mask, rvec, tvec);
-    return 0;
-}
-
 };
+
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
     extern Ten::init_3d_box _INIT_3D_BOX_;
 }       // namespace Ten
