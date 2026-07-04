@@ -142,19 +142,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/3dto2d_node.cpp)
-add_executable(t3dto2d_node src/t3dto2d.cpp)
-add_executable(t3dto2d2_node src/t3dto2d2.cpp)
-add_executable(t2dto3d_node src/t2dto3d.cpp)
-add_executable(t2dto3d_ld_node src/t2dto3d_ld.cpp)
-add_executable(t2dto3d_zbuffer_node src/t2dto3d_zbuffer.cpp)
-add_executable(t2dto3d_zbuffer2_node src/t2dto3d_zbuffer2.cpp)
-add_executable(t2dto3d_zbuffer_ld_node src/t2dto3d_zbuffer_ld.cpp)
-add_executable(zbuffer_orb_node src/zbuffer_orb_1.cpp)
-add_executable(orb_feature_detector_node src/orb_feature.cpp)
-add_executable(zbuffer_func_debug_node src/zbuffer_func_debug.cpp)
-add_executable(zbuffer_func_final_node src/zbuffer_func_final.cpp)
-
-add_executable(zbuffer_func_final3_node src/zbuffer_func_final3.cpp)
+add_executable(zbuffer_func_node src/zbuffer_func.cpp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -166,45 +154,28 @@ add_executable(zbuffer_func_final3_node src/zbuffer_func_final3.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(t3dto2d_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t3dto2d2_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t2dto3d_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t2dto3d_ld_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t2dto3d_zbuffer_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t2dto3d_zbuffer2_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(t2dto3d_zbuffer_ld_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(orb_feature_detector_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(zbuffer_orb_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(zbuffer_func_debug_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(zbuffer_func_final_node
+target_link_libraries(zbuffer_func_node
   ${catkin_LIBRARIES}
 )
 
-target_link_libraries(zbuffer_func_final3_node
-  ${catkin_LIBRARIES}
+set(TEN_SRC_FILES
+  src/package/method_math.cpp
+  src/package/zbuffer_simplify.cpp
+  src/package/world_to_camera.cpp
+  # 其他Ten相关的.cpp文件都要加在这里
 )
 
-
+# 可选：将Ten相关代码编译为静态库（方便链接）
+add_library(${PROJECT_NAME}_ten_utils
+  ${TEN_SRC_FILES}
+)
+target_link_libraries(zbuffer_func_node
+  ${PROJECT_NAME}_ten_utils  # 链接Ten的静态库
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+)
 
 #############
 ## Install ##

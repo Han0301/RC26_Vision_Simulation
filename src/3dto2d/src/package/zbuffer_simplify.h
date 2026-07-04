@@ -27,14 +27,14 @@
 
 namespace Ten{
 
-#define L_ 1.2f         // 台阶长度
-#define H_ 0.2f         // 台阶高度
-#define ly1_ 0.425f     // 台阶到方块的间距
-#define lx1_ 0.425f     // 台阶到方块的间距
-#define lh_ 0.35f       // 方块的长度
-#define X_ 2.58f        // 初始位置到梅花林1号位置边角的x轴距离
-#define Y_ 3.395f       // 初始位置到梅花林1号位置边角的y轴距离
-#define LIDAR_HEIGHT_ 0.717     // 雷达的高度
+#define _L_ 1.2
+#define _H_ 0.2
+#define _ly1_ 0.425
+#define _ly2_ 0.775
+#define _lx1_ 0.425
+#define _lh_ 0.35 
+#define _X_  3.17             
+#define _Y_  1.2       
 
 struct surface_2d_point {        
     int idx;                       // 对应方块索引
@@ -104,38 +104,66 @@ struct init_3d_box{
         }
 
         // 初始化 W_object_plum_points_
-        float arr_[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
+        float _arr[12] = {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
+        //方块8个3D点（移除0.1 + 交换X/Y坐标）
+
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                // 方块8个3D点
-                W_object_plum_points_[(j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + lx1_,       Y_ - i*L_ - ly1_,       arr_[i*3+j]+lh_);                
-                W_object_plum_points_[(j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + lx1_,       Y_ - i*L_ - ly1_ - lh_, arr_[i*3+j]+lh_);                
-                W_object_plum_points_[(j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + lx1_,       Y_ - i*L_ - ly1_ - lh_, arr_[i*3+j]);
-                W_object_plum_points_[(j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + lx1_,       Y_ - i*L_ - ly1_,       arr_[i*3+j]);
-                W_object_plum_points_[(j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + lx1_ + lh_, Y_ - i*L_ - ly1_,       arr_[i*3+j]+lh_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + lx1_ + lh_, Y_ - i*L_ - ly1_ - lh_, arr_[i*3+j]+lh_);
-                W_object_plum_points_[(j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + lx1_ + lh_, Y_ - i*L_ - ly1_ - lh_, arr_[i*3+j]);
-                W_object_plum_points_[(j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + lx1_ + lh_, Y_ - i*L_ - ly1_,       arr_[i*3+j]);
+                W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));
+                W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));
+                W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));                
+                W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));                
+                W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+                W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
             }
         } 
+
+        // 台阶8个3D点（先颠倒X/Y坐标，再将新X取反）
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                // 台阶8个3D点
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_,      Y_ - i*L_,      arr_[i*3+j]);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_,      Y_ - i*L_- L_,  arr_[i*3+j]);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_,      Y_ - i*L_- L_,  0);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_,      Y_ - i*L_,      0);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + L_, Y_ - i*L_,      arr_[i*3+j]);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + L_, Y_ - i*L_ - L_, arr_[i*3+j]);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + L_, Y_ - i*L_ - L_, 0);
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + L_, Y_ - i*L_,      0);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, 0));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, 0));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, _arr[j*3+i] ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, 0 ));
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, 0));
             }
         }    
 
+        // for(int j = 0; j < 4; j++) {
+        //     for(int i = 0; i < 3; i++) {
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f((_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f((_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f((_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f((_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f((_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f((_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));                
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f((_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
+        //         W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f((_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+        //     }
+        // } 
+
+        // // 台阶8个3D点（先颠倒X/Y坐标，再将新X取反）
+        // for(int j = 0; j < 4; j++) {
+        //     for(int i = 0; i < 3; i++) {
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = (cv::Point3f((_X_ + j*_L_), _Y_ + i*_L_, _arr[j*3+i] ));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = (cv::Point3f((_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i] ));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = (cv::Point3f((_X_ + j*_L_), _Y_ + i*_L_ + _L_, 0));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = (cv::Point3f((_X_ + j*_L_), _Y_ + i*_L_, 0));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = (cv::Point3f((_X_ + j*_L_ + _L_), _Y_ + i*_L_, _arr[j*3+i] ));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = (cv::Point3f((_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = (cv::Point3f((_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, 0 ));
+        //         W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = (cv::Point3f((_X_ + j*_L_ + _L_), _Y_ + i*_L_, 0));
+        //     }
+        // }    
         // 初始化 LM_object_plum_points_，C_object_plum_points_
         for(int i = 0; i < 96 * 2; i++){
             //减雷达高度
-            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z - LIDAR_HEIGHT_);
+            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
 
             C_object_plum_points_[i]  = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
         }    
@@ -213,13 +241,13 @@ void set_debug_roi_image(
 /**
  * @brief 直接在原图像中绘制框
  * @param image 输入图像
- * @param object_2d_points_lists 输入的 方块 2d 点对
+ * @param object_plum_2d_points_ 输入的 方块 和台阶的 2d 点对
  * @return cv::Mat 调试图像
  * 
 */
 cv::Mat update_debug_image(
     cv::Mat image,
-    const std::vector<std::vector<surface_2d_point>>& object_2d_points_lists
+    const std::vector<cv::Point2f>& object_plum_2d_points_
 );
 /**
  * @brief 通过图像来 判断 是否有方块

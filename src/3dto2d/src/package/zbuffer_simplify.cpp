@@ -245,8 +245,8 @@ namespace Ten
                 continue;
             }
 
-            if (valid_max_points.size() <= 150) {
-                ROS_WARN("valid_max_points.size() <= 150", box_lists[i].idx);
+            if (valid_max_points.size() <= 800) {
+                ROS_WARN("valid_max_points.size() <= 800", box_lists[i].idx);
                 // box_lists[i].zbuffer_flag = -1; // 标记异常
                 continue;
             }
@@ -454,41 +454,26 @@ namespace Ten
 
     cv::Mat Ten_zbuffer_simplify::update_debug_image(
         cv::Mat image,
-        const std::vector<std::vector<surface_2d_point>>& object_plum_2d_points_lists
+        const std::vector<cv::Point2f>& object_plum_2d_points_
     ){
         // 1. 检查输入有效性
         if (image.empty()) {
             ROS_WARN("Image is empty, skip draw");
             return cv::Mat();
         }
+        cv::Mat img;
+        image.copyTo(img);
 
-        std::vector<surface_2d_point> object_front_2d = object_plum_2d_points_lists[0];
-        std::vector<surface_2d_point> object_side_2d = object_plum_2d_points_lists[1];
-        std::vector<surface_2d_point> object_up_2d = object_plum_2d_points_lists[2];
-
-        for (size_t i = 0; i < object_side_2d.size(); i++) {
-            if (i >= object_front_2d.size() || i >= object_up_2d.size()) break;
+        for (size_t i = 0; i < object_plum_2d_points_.size(); i++) {
             
-            auto& o_front = object_front_2d[i];
-            auto& o_side = object_side_2d[i];
-            auto& o_up = object_up_2d[i];
-
-            cv::line(image, o_front.left_up, o_front.right_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_front.right_up, o_front.right_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_front.right_down, o_front.left_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_front.left_down, o_front.left_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-
-            cv::line(image, o_side.left_up, o_side.right_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_side.right_up, o_side.right_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_side.right_down, o_side.left_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_side.left_down, o_side.left_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-
-            cv::line(image, o_up.left_up, o_up.right_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_up.right_up, o_up.right_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_up.right_down, o_up.left_down, cv::Scalar(0,255,0), 2, cv::LINE_AA);
-            cv::line(image, o_up.left_down, o_up.left_up, cv::Scalar(0,255,0), 2, cv::LINE_AA);
+            if (i < 96 && i % 8 == 0){
+            cv::line(img, object_plum_2d_points_[i], object_plum_2d_points_[i + 1], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+            cv::line(img, object_plum_2d_points_[i + 1], object_plum_2d_points_[i + 2], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+            cv::line(img, object_plum_2d_points_[i + 2], object_plum_2d_points_[i + 3], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+            cv::line(img, object_plum_2d_points_[i + 3], object_plum_2d_points_[i], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+        }   
     }
-    return image;
+    return img;
 
     }
 
