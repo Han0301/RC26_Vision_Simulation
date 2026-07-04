@@ -77,7 +77,19 @@ rosrun 3dto2d hsv_detection_node
 - **修改** `zbuffer_func.cpp`，集成新的遮挡处理
 
 ### world_ws9 — 旗舰版
-*待更新*
+- **新增** `camera_calibration.cpp` 相机标定实现（原仅头文件）
+- **优化** `occlusion_handing` 遮挡处理算法
+  - 重构宏定义，参数可配置化
+  - 新增 `roi_valid_flag` 有效区域标志位
+  - 引入 Eigen 线性代数库支持
+  - 增加现代 C++ 随机数生成与异常处理
+- **增强** `method_math` 工具库
+  - 新增 PCD 点云文件读写支持
+  - 新增 `tvectovector3d` 平移向量转换
+  - 新增 `getpath` 路径搜索功能
+  - 新增 `readPoseFromTxt` 位姿文件解析
+- **编译优化** 启用 `-O2 -Wall -Wextra` 编译选项
+- 优化 `world_to_camera` 外参转换精度
 
 ### world_ws10 — 数据集录制版
 *待更新*

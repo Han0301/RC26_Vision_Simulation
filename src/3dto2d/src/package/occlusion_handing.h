@@ -5,8 +5,6 @@
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/Image.h>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
 #include <Eigen/Geometry>
 #include <nav_msgs/Odometry.h>
 #include <algorithm>
@@ -24,26 +22,29 @@
 #include <pcl/point_types.h>
 #include <pcl/common/transforms.h>
 #include <cfloat>
-
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
+#include <Eigen/Core>
+#include <random>   // 现代随机数库（C++11及以上）
+#include <stdexcept> // 用于异常处理
 namespace Ten{
 
-#define _L_ 1.2
-#define _H_ 0.2
-#define _ly1_ 0.425
-#define _ly2_ 0.775
-#define _lx1_ 0.425
-#define _lh_ 0.35 
-#define _X_  3.17             
-#define _Y_  1.2  
-
-struct surface_2d_point {        
-    int idx;                       // 对应方块索引
-    cv::Point2f left_up;           // 左上2D点
-    cv::Point2f right_up;          // 右上2D点
-    cv::Point2f right_down;        // 右下2D点
-    cv::Point2f left_down;         // 左下2D点
-    float surface_depth;           // 该表面的深度值
-};
+#define L_ 1.2f                 // 台阶长度
+#define H_ 0.2f                 // 台阶高度
+#define lx1_ 0.425f             // 台阶到方块的间距
+#define ly1_ 0.425f             // 台阶到方块的间距
+#define lh_ 0.35f               // 方块的长度
+#define X_ 3.2f                 // 初始位置到梅花林1号位置边角的x轴距离
+#define Y_ -1.2f                // 初始位置到梅花林1号位置边角的y轴距离
+#define LIDAR_HEIGHT_ 0         // 雷达的高度 
+#define box_half_length_ 0.175  // 方块长度的一半
+#define step_half_length_ 0.6   //台阶水平边长的一半
+// #define offset_x_ 0.06          // x方向上的偏移量
+// #define offset_y_ 0.06            // y方向上的偏移量
+// #define offset_z_ 0.06             // z方向上的偏移量
+#define offset_x_ 0.00          // x方向上的偏移量
+#define offset_y_ 0.00            // y方向上的偏移量
+#define offset_z_ 0.00             // z方向上的偏移量
 
 struct box{
     int idx;                             // 表示位置的下标索引
@@ -52,6 +53,16 @@ struct box{
     float confidence = 0.0f;                // 自信度
     int zbuffer_flag = 0;                    // zbuffer是否处理的标志位， 0 表示未处理， 1 表示已处理， -1 表示异常
     int exist_flag = -1;                      // 是否筛空的标志位， 0 表示空， 1 表示有方块， -1 表示未处理
+    int roi_valid_flag = 0;                   // 用于表示当前的roi 图像是否有效
+};
+
+struct surface_2d_point {        
+    int idx;                       // 对应方块索引
+    cv::Point2f left_up;           // 左上2D点
+    cv::Point2f right_up;          // 右上2D点
+    cv::Point2f right_down;        // 右下2D点
+    cv::Point2f left_down;         // 左下2D点
+    float surface_depth;           // 该表面的深度值
 };
 
 // 初始化方块和台阶的3d点，2d点的 结构体
@@ -88,38 +99,38 @@ struct init_3d_box{
         }
 
         // 初始化 W_object_plum_points_
-        float _arr[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
+        float arr_[12] {0.4, 0.2, 0.4, 0.2, 0.4, 0.6, 0.4, 0.6, 0.4, 0.2, 0.4, 0.2};
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                W_object_plum_points_[(j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));
-                W_object_plum_points_[(j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));
-                W_object_plum_points_[(j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]+_lh_));                
-                W_object_plum_points_[(j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]+_lh_));                
-                W_object_plum_points_[(j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly2_, _arr[j*3+i]));
-                W_object_plum_points_[(j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _lx1_ + _lh_), _Y_ + i*_L_ + _ly1_, _arr[j*3+i]));
+                // 方块8个3D点
+                W_object_plum_points_[(j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);                
+                W_object_plum_points_[(j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);                
+                W_object_plum_points_[(j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + lx1_ + offset_x_,       Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j]+lh_ + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j]+lh_ + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ - lh_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[(j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + lx1_ + lh_ + offset_x_, Y_ - i*L_ - ly1_ + offset_y_,       arr_[i*3+j] + offset_z_);
             }
         } 
-
-        // 台阶8个3D点（先颠倒X/Y坐标，再将新X取反）
         for(int j = 0; j < 4; j++) {
             for(int i = 0; i < 3; i++) {
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_ + _L_, 0));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = (cv::Point3f(-(_X_ + j*_L_), _Y_ + i*_L_, 0));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, _arr[j*3+i] ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, _arr[j*3+i]));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_ + _L_, 0 ));
-                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = (cv::Point3f(-(_X_ + j*_L_ + _L_), _Y_ + i*_L_, 0));
+                // 台阶8个3D点
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 0] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 1] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 2] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_- L_ + offset_y_,  0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 3] = cv::Point3f(X_ + j*L_ + offset_x_,      Y_ - i*L_ + offset_y_,      0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 4] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 5] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, arr_[i*3+j] + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 6] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ - L_ + offset_y_, 0 + offset_z_);
+                W_object_plum_points_[96 + (j * 3 + i) * 8 + 7] = cv::Point3f(X_ + j*L_ + L_ + offset_x_, Y_ - i*L_ + offset_y_,      0 + offset_z_);
             }
-        }  
+        }    
 
         // 初始化 LM_object_plum_points_，C_object_plum_points_，pcl_LM_plum_object_points_，pcl_C_plum_object_points_
         for(int i = 0; i < 96 * 2; i++){
             //减雷达高度
-            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
+            LM_object_plum_points_[i] = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z - LIDAR_HEIGHT_);
             C_object_plum_points_[i]  = cv::Point3f(W_object_plum_points_[i].x, W_object_plum_points_[i].y, W_object_plum_points_[i].z);
             pcl::PointXYZ tmp;
             tmp.x = LM_object_plum_points_[i].x;
@@ -175,12 +186,16 @@ public:
      * @param C_object_plum_points 相机坐标系下，方块和台阶的3D点
      * @param object_plum_2d_points  像素坐标系下，方块和台阶的2d点
      * @param box_lists 方块的列表
+     * @param debug_mode 是否启用调试模式， 默认是false
+     * @param scale 缩放比例
      */
     void set_box_lists_(
-        const cv::Mat& image,     
+        const cv::Mat& input_image,     
         const std::vector<cv::Point3f>& C_object_plum_points,
         const std::vector<cv::Point2f>& object_plum_2d_points,
-        std::vector<box>& box_lists);
+        std::vector<box>& box_lists,
+        bool debug_mode = false,
+        float scale = 0.65f);
 
     /**
      * @brief 直接在原图像中绘制框
@@ -193,7 +208,6 @@ public:
         cv::Mat image,
         const std::vector<cv::Point2f>& object_plum_2d_points_
     );
-    
     /**
      * @brief 拼接调试图像
      * @param box_lists  方块的列表，std::vector<box>
@@ -202,6 +216,7 @@ public:
     void set_debug_roi_image(
         std::vector<Ten::box>box_lists,
         cv::Mat& debug_best_roi_image);
+
 private:
     int exist_boxes_[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     int interested_boxes_[12]= {1,1,1,1,1,1,1,1,1,1,1,1};
@@ -237,7 +252,6 @@ private:
             float right_depth = cal_distance(C_object_plum_points[j + i + 1], C_object_plum_points[j + i + 5], C_object_plum_points[j + i + 6],C_object_plum_points[j + i + 2]);
             float up_depth = cal_distance(C_object_plum_points[j + i + 4], C_object_plum_points[j + i + 5], C_object_plum_points[j + i + 1],C_object_plum_points[j + i]);
             float down_depth = cal_distance(C_object_plum_points[j + i + 6], C_object_plum_points[j + i + 7], C_object_plum_points[j + i + 3],C_object_plum_points[j + i + 2]);
-            
             if (front_depth < back_depth)
             {
                 surface_2d.push_back({idx, object_plum_2d_points[j + i], object_plum_2d_points[j + i + 1], object_plum_2d_points[j + i + 2],object_plum_2d_points[j + i + 3],front_depth});
@@ -340,29 +354,67 @@ private:
     bool is_update_image(
         const std::vector<box>& box_lists,
         const std::vector<cv::Point2f>& valid_max_points,
-        const int exist_boxes[12],
         const int interested_boxes[12],
         const int i
     )
     {
         bool update_image = true;
-        if (valid_max_points.empty() || valid_max_points.size() <= 600) {
-            std::cout << "🤡in func: set_box_lists_ 4.2, box idx= " <<  i / 3 + 1 <<  ", valid_max_points is empty or size() = " <<  valid_max_points.size()<< " < 600, skip crop ROI" << std::endl;
-            // box_lists[i].zbuffer_flag = -1; // 标记异常
+        if (valid_max_points.empty() || valid_max_points.size() <= 800) {
             update_image = false;
         }
-        else if (!(exist_boxes[i / 3] != 0 && interested_boxes[i / 3] == 1))
+        else if (interested_boxes[i / 3] == 0)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,!(exist_boxes[i] != 0 && interested_boxes[i] == 1), skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         }
         else if (box_lists[i / 3].zbuffer_flag == -1)
         {
-            std::cout << "🤡in func: set_box_lists_ 4.2,box_lists[i].zbuffer_flag == -1, skip crop ROI, box idx= " <<  i / 3 + 1 << std::endl;
             update_image = false;
         } 
         return update_image;
     }
+
+
+// 安全生成掩码（功能、逻辑、输出完全和之前一致）
+cv::Mat createSurfaceMask(const surface_2d_point& surf, const cv::Size& img_size) {
+    cv::Mat mask = cv::Mat::zeros(img_size, CV_8UC1);
+    if (img_size.width <= 0 || img_size.height <= 0) {
+        return mask;
+    }
+
+    const int cols = img_size.width;
+    const int rows = img_size.height;
+
+    auto clampPoint = [&](float x, float y) -> cv::Point {
+        int cx = cvRound(x);
+        int cy = cvRound(y);
+        cx = std::max(0, std::min(cx, cols - 1));
+        cy = std::max(0, std::min(cy, rows - 1));
+        return cv::Point(cx, cy);
+    };
+
+    std::vector<cv::Point> contour = {
+        clampPoint(surf.left_up.x,    surf.left_up.y),
+        clampPoint(surf.right_up.x,   surf.right_up.y),
+        clampPoint(surf.right_down.x, surf.right_down.y),
+        clampPoint(surf.left_down.x,  surf.left_down.y)
+    };
+
+    if (contour.size() >= 3) {
+        bool valid = false;
+        for (size_t i = 1; i < contour.size(); i++) {
+            if (contour[i] != contour[0]) {
+                valid = true;
+                break;
+            }
+        }
+        if (valid) {
+            std::vector<std::vector<cv::Point>> contours = {contour};
+            cv::fillPoly(mask, contours, cv::Scalar(255));
+        }
+    }
+    return mask;
+}
+
 };
     extern Ten::Ten_occlusion_handing _OCCLUSION_HANDING_;
     extern Ten::init_3d_box _INIT_3D_BOX_;

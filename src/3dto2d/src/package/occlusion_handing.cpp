@@ -4,11 +4,34 @@
 
 namespace Ten{
 void Ten_occlusion_handing::set_box_lists_(  
-    const cv::Mat& image,     
+    const cv::Mat& input_image,     
     const std::vector<cv::Point3f>& C_object_plum_points,
     const std::vector<cv::Point2f>& object_plum_2d_points,
-    std::vector<box>& box_lists)
+    std::vector<box>& box_lists,
+    bool debug_mode,
+    float scale)
 {
+    // ====================== 计时统计静态变量（仅初始化一次）======================
+    static int call_count = 0;                // 函数调用次数
+    static double total_time_sec1 = 0.0;     // 段1总耗时(ms)：更新2d点列表
+    static double total_time_sec2 = 0.0;     // 段2总耗时(ms)：填充台阶深度
+    static double total_time_sec3a = 0.0;    // 段3a总耗时(ms)：方块预处理(点/轮廓/范围计算)
+    static double total_time_sec3b = 0.0;    // 段3b总耗时(ms)：方块深度缓冲填充
+    static double total_time_sec4 = 0.0;     // 段4总耗时(ms)：裁剪图像生成ROI
+    call_count++; // 每次调用计数+1
+
+    // 0 resize 缩放部分
+    cv::Mat image;          // 最终用于处理的图像
+    std::vector<cv::Point2f> process_2d_points; // 最终用于处理的2D点
+
+    // 缩小图像
+    cv::resize(input_image, image, cv::Size(), scale, scale, cv::INTER_NEAREST);
+    // 同步缩小2D点
+    process_2d_points.reserve(object_plum_2d_points.size());
+    for (const auto& p : object_plum_2d_points) {
+        process_2d_points.emplace_back(p.x * scale, p.y * scale);
+    }
+    
     // 1. 取到 exist_boxes_ 和 interested_boxes_
     int exist_boxes[12];
     int interested_boxes[12];
@@ -20,16 +43,40 @@ void Ten_occlusion_handing::set_box_lists_(
             interested_boxes[i] = interested_boxes_[i];
         }
     }
+    // 调试打印部分
+    if (debug_mode)
+    {
+        std::cout << "__________________in func : set_box_lists_____________" << std::endl;
+        std::cout << "     exist_boxes: ";
+        for (int i = 0; i< 12; i++)
+        {
+            std::cout << exist_boxes[i] << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "interested_boxes: ";
+        for (int i = 0; i< 12; i++)
+        {
+            std::cout << interested_boxes[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    // ====================== 计时段1开始：根据深度信息 更新2d点列表 ======================
+    auto start_sec1 = std::chrono::high_resolution_clock::now();
     // 2. 根据深度信息 更新2d点列表
     std::vector<surface_2d_point> object_2d;
-    std::vector<surface_2d_point> plum_2d;      // 通过下标来访问， 【0】表示 正面或后面， 【1】表示 左侧面或右侧面， 【2】表示 上面或地面
-    set_surface_2d_point(C_object_plum_points, object_plum_2d_points, object_2d, "object");
-    set_surface_2d_point(C_object_plum_points, object_plum_2d_points, plum_2d, "plum");
+    std::vector<surface_2d_point> plum_2d;
+    set_surface_2d_point(C_object_plum_points, process_2d_points, object_2d, "object");
+    set_surface_2d_point(C_object_plum_points, process_2d_points, plum_2d, "plum");
+    // ====================== 计时段1结束 ======================
+    auto end_sec1 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> dur_sec1 = end_sec1 - start_sec1;
+    total_time_sec1 += dur_sec1.count();
 
     // 3. 填充 zbuffer 矩阵
     // 3.1 初始化深度缓冲（初始值为最大浮点数，表示无深度）
-    static cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
-    static cv::Mat object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+    cv::Mat zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+    cv::Mat object_zbuffer = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
 
     // 3.2 检查surface_2d_point 2d点 合理性
     if (!(object_2d.size() == 36 && plum_2d.size() == 36)){
@@ -38,7 +85,44 @@ void Ten_occlusion_handing::set_box_lists_(
         return;
     }
 
+    // ====================== 计时段2开始：先填充台阶的深度 ======================
+    auto start_sec2 = std::chrono::high_resolution_clock::now();
     // 3.3 先填充台阶的深度
+
+    std::vector<surface_2d_point> plum_surface_list;
+
+    // 3.3 先填充台阶的深度 【终极版：和你原始代码效果完全一致，无崩溃】
+    // const int img_rows = image.rows;
+    // const int img_cols = image.cols;
+
+    // for (size_t i = 0; i < plum_2d.size(); i+=3) 
+    // {
+    //     auto& p_front = plum_2d[i];
+    //     auto& p_side = plum_2d[i + 1];
+    //     auto& p_up = plum_2d[i + 2];
+
+    //     std::vector<surface_2d_point> surfaces = {p_front, p_side, p_up};
+    //     for (auto& surf : surfaces) {
+    //         cv::Mat mask = createSurfaceMask(surf, image.size());
+            
+    //         // 🔥 优化：指针直接访问（替代.at<>()，速度提升5倍，逻辑完全不变）
+    //         for (int y = 0; y < img_rows; y++) {
+    //             // 获取行指针
+    //             const uchar* mask_ptr = mask.ptr<uchar>(y);
+    //             float* zbuf_ptr = zbuffer.ptr<float>(y);
+                
+    //             for (int x = 0; x < img_cols; x++) {
+    //                 // 原始逻辑：掩码=255 且 深度更小则覆盖
+    //                 if (mask_ptr[x] == 255) {
+    //                     if (surf.surface_depth < zbuf_ptr[x]) {
+    //                         zbuf_ptr[x] = surf.surface_depth;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
     for (size_t i = 0; i < plum_2d.size(); i+=3) 
     {
         auto& p_front = plum_2d[i];
@@ -50,14 +134,19 @@ void Ten_occlusion_handing::set_box_lists_(
         bool all_outside = set_all_outside(p_front,p_side,p_up,image.cols,image.rows,all_points);
         if (all_outside) continue; 
         // 3.3.2 构建台阶轮廓, 填充台阶深度到临时矩阵 plum_tmp
-        static cv::Mat plum_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+        cv::Mat plum_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
         set_temp(p_front,p_side,p_up,plum_temp);
         // 3.3.3 计算台阶像素范围
         float plum_x_min = FLT_MAX,plum_y_min = FLT_MAX,plum_x_max = FLT_MIN,plum_y_max = FLT_MIN;
         cal_points_range(all_points,plum_x_min,plum_y_min,plum_x_max,plum_y_max);
         // 3.3.4 写入主zbuffer（台阶深度更近则更新）
-        for (int row = int(plum_y_min) - 1; row < int(plum_y_max) + 1; ++row) {
-            for (int col = int(plum_x_min) - 1; col < int(plum_x_max) + 1; ++col) {
+        const int row_start = int(plum_y_min);
+        const int row_end = int(plum_y_max);
+        const int col_start = int(plum_x_min);
+        const int col_end = int(plum_x_max);
+
+        for (int row = row_start; row < row_end; ++row) {
+            for (int col = col_start; col < col_end; ++col) {
                 if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
                 if (plum_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
                     zbuffer.at<float>(row, col) = plum_temp.at<float>(row, col);
@@ -65,9 +154,19 @@ void Ten_occlusion_handing::set_box_lists_(
             }
         }  
     }
+    // ====================== 计时段2结束 ======================
+    auto end_sec2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> dur_sec2 = end_sec2 - start_sec2;
+    total_time_sec2 += dur_sec2.count();
+
     // 3.4 再填充方块的深度, 4 在循环中填充各个方块的roi图像信息
     for(size_t i = 0; i < object_2d.size(); i+=3)
     {
+        // ====================== 计时段3a开始：方块预处理 ======================
+        auto start_sec3a = std::chrono::high_resolution_clock::now();
+        // 3.4.0 重置 roi_valid_flag 状态
+        box_lists[i / 3].roi_valid_flag = 0;
+
         auto& o_front = object_2d[i];
         auto& o_side = object_2d[i + 1];
         auto& o_up = object_2d[i + 2];
@@ -77,24 +176,58 @@ void Ten_occlusion_handing::set_box_lists_(
         bool all_outside = set_all_outside(o_front,o_side,o_up,image.cols,image.rows,all_points);
         if (all_outside) continue; 
         // 3.4.2 构建方块轮廓, 填充方块深度到临时矩阵 object_temp
-        static cv::Mat object_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
+        cv::Mat object_temp = cv::Mat::ones(image.rows, image.cols, CV_32F) * FLT_MAX;
         set_temp(o_front,o_side,o_up,object_temp);
         // 3.4.3 计算方块像素范围
         float object_x_min = FLT_MAX,object_y_min = FLT_MAX,object_x_max = FLT_MIN,object_y_max = FLT_MIN;
         cal_points_range(all_points,object_x_min,object_y_min,object_x_max,object_y_max);
+        // ====================== 计时段3a结束 ======================
+        auto end_sec3a = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> dur_sec3a = end_sec3a - start_sec3a;
+        total_time_sec3a += dur_sec3a.count();
+
+        // ====================== 计时段3b开始：方块深度缓冲填充 ======================
+        auto start_sec3b = std::chrono::high_resolution_clock::now();
         // 3.4.4 合并到方块深度缓冲 object_zbuffer + 全局深度缓冲 zbuffer, 并 写入当前方块范围的 depth_regions 
-        std::unordered_map<float, std::vector<cv::Point2f>> depth_regions;        // depth_regions 表示 深度-对应深度的点集
-        for (int row = int(object_y_min) - 1; row < int(object_y_max) + 1; ++row) {
-            for (int col = int(object_x_min) - 1; col < int(object_x_max) + 1; ++col) {
-                if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
-                if (object_temp.at<float>(row, col) == FLT_MAX) continue;
-                if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
-                    zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
-                    object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+        std::unordered_map<float, std::vector<cv::Point2f>> depth_regions;
+        const int row_start = int(object_y_min);
+        const int row_end = int(object_y_max);
+        const int col_start = int(object_x_min);
+        const int col_end = int(object_x_max);
+        if (exist_boxes[i / 3])
+        {
+            for (int row = row_start; row < row_end; ++row) {
+                for (int col = col_start; col < col_end; ++col) {
+                    if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
+                    if (object_temp.at<float>(row, col) == FLT_MAX) continue;
+                    if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
+                        zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                        object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                    }
+                    depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
                 }
-                depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
-            }
-        }     
+            }     
+        }
+        else
+        {
+            for (int row = row_start; row < row_end; ++row) {
+                for (int col = col_start; col < col_end; ++col) {
+                    if (row < 0 || row >= image.rows || col < 0 || col >= image.cols) continue;
+                    if (object_temp.at<float>(row, col) == FLT_MAX) continue;
+                    if (object_temp.at<float>(row, col) < zbuffer.at<float>(row, col)) {
+                        object_zbuffer.at<float>(row, col) = object_temp.at<float>(row, col);
+                    }
+                    depth_regions[object_zbuffer.at<float>(row, col)].emplace_back(col, row);
+                }
+            }   
+        }
+        // ====================== 计时段3b结束 ======================
+        auto end_sec3b = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> dur_sec3b = end_sec3b - start_sec3b;
+        total_time_sec3b += dur_sec3b.count();
+
+        // ====================== 计时段4开始：裁剪图像信息 ======================
+        auto start_sec4 = std::chrono::high_resolution_clock::now();
         // 4 填充好单个方块的zbuffer深度信息后， 开始裁剪图像信息
         // 4.1 在当前方块范围内，找到 有效的，面积最大的（认为在方块几个面中最优）的 点集 valid_max_points
         int max_points_count = INT_MIN;
@@ -109,18 +242,24 @@ void Ten_occlusion_handing::set_box_lists_(
             if(!is_valid) continue;
             if(points.empty()) continue;
 
-            if (int(points.size()) > max_points_count){
-                valid_max_points = points;
-                max_points_count = points.size(); 
-            }
+            // 逻辑2： 同时取三个面填来充 roi_image
+            valid_max_points.insert(valid_max_points.end(), points.begin(),points.end());
         }
         ///---------------------------------------------------------4.2 不更新 roi_image 的条件 -------------------------------
-        bool is_update_img = is_update_image(box_lists,valid_max_points,exist_boxes,interested_boxes,i);
-        if (!(is_update_img)) continue;
+        bool is_update_img = is_update_image(box_lists,valid_max_points,interested_boxes,i);
+        if (debug_mode)
+        {
+            std::cout << "place: " << i / 3 + 1 << ", valid_max_points.size(): " << valid_max_points.size() << ", is_update_img: " << is_update_img << std::endl;
+        }
+        if (!is_update_img) continue;
+
+        // 填充point_size
+        // box_lists[i / 3].point_size = valid_max_points.size();
+
         // 4.3 准备有效区域的掩码, 并更新有效区域的外接x_min,y_min,x_max,y_max
         int x_min = INT_MAX, x_max = INT_MIN;   
         int y_min = INT_MAX, y_max = INT_MIN;
-        cv::Mat roi_mask = cv::Mat::zeros(image.size(), CV_8UC1);       // 掩码的强制格式要求：单通道、8 位灰度图
+        cv::Mat roi_mask = cv::Mat::zeros(image.size(), CV_8UC1);
         for (const auto& p : valid_max_points){
             if (p.y >= 0 && p.y < roi_mask.rows && p.x >= 0 && p.x < roi_mask.cols) {
                 roi_mask.at<uchar>(p.y, p.x) = 255;
@@ -132,20 +271,33 @@ void Ten_occlusion_handing::set_box_lists_(
         }
         // 4.4 裁剪ROI
         cv::Rect roi_rect(x_min, y_min, x_max - x_min + 1, y_max - y_min + 1);
-        // 4.4.1 校验roi_rect，避免宽高为负
+        // 4.4.1 校验roi_rect
         if (roi_rect.width <= 0 || roi_rect.height <= 0 || 
             roi_rect.x + roi_rect.width > image.cols || 
             roi_rect.y + roi_rect.height > image.rows) {
             std::cout << "🤡in func: set_box_lists_ 4.4.1,Invalid ROI rect: x= " <<roi_rect.x <<", y="<<roi_rect.y<<", w="<<roi_rect.width<<", h="<<roi_rect.height <<", skip" << std::endl;
             continue;
         }
-        // 4.4.2 生成 image_roi,mask_roi
-        cv::Mat image_roi = image(roi_rect);
-        cv::Mat mask_roi = roi_mask(roi_rect);
+        // 坐标反向缩放：还原到原图高清坐标
+        int ori_x = cvRound(roi_rect.x / scale);
+        int ori_y = cvRound(roi_rect.y / scale);
+        int ori_w = cvRound(roi_rect.width / scale);
+        int ori_h = cvRound(roi_rect.height / scale);
+        cv::Rect roi_rect_ori(ori_x, ori_y, ori_w, ori_h);
+
+        roi_rect_ori &= cv::Rect(0, 0, input_image.cols, input_image.rows);
+        if (roi_rect_ori.area() <= 0) continue;
+
+        // 4.4.2 生成 原图像的 image_roi,mask_roi
+        cv::Mat image_roi = input_image(roi_rect_ori);
+
+        // 小图掩码缩放回原图
+        cv::Mat mask_roi_ori;
+        cv::resize(roi_mask(roi_rect), mask_roi_ori, roi_rect_ori.size(), 0, 0, cv::INTER_NEAREST);
 
         // 4.5 在 image_roi 中 生成有效区域 mask_roi
         cv::Mat crop_roi = cv::Mat::zeros(image_roi.size(), image_roi.type());
-        image_roi.copyTo(crop_roi, mask_roi);
+        image_roi.copyTo(crop_roi, mask_roi_ori);
 
         // 4.6 转为正方形
         int max_side = std::max(crop_roi.cols, crop_roi.rows);
@@ -167,9 +319,32 @@ void Ten_occlusion_handing::set_box_lists_(
         // 4.8 准备填充 box_lists 信息
         square_roi.copyTo(box_lists[i / 3].roi_image);
         box_lists[i / 3].zbuffer_flag = 1;
+        box_lists[i / 3].roi_valid_flag = 1;
+        // ====================== 计时段4结束 ======================
+        auto end_sec4 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> dur_sec4 = end_sec4 - start_sec4;
+        total_time_sec4 += dur_sec4.count();
     }
 
-
+    // ====================== 函数末尾：执行1000次后打印总耗时并重置 ======================
+    if (call_count >= 1000) {
+        std::cout << "\n==================================== 1000次调用总耗时统计(ms) ====================================" << std::endl;
+        std::cout << "段1(更新2D点列表)    总耗时：" << total_time_sec1 << " ms" << std::endl;
+        std::cout << "段2(填充台阶深度)    总耗时：" << total_time_sec2 << " ms" << std::endl;
+        std::cout << "段3a(方块预处理)     总耗时：" << total_time_sec3a << " ms" << std::endl;
+        std::cout << "段3b(深度缓冲填充)   总耗时：" << total_time_sec3b << " ms" << std::endl;
+        std::cout << "段4(裁剪生成ROI)     总耗时：" << total_time_sec4 << " ms" << std::endl;
+        std::cout << "总耗时：" << total_time_sec1 + total_time_sec2 + total_time_sec3a + total_time_sec3b + total_time_sec4 << " ms" << std::endl;
+        std::cout << "==============================================================================================\n" << std::endl;
+        
+        // 重置统计数据
+        call_count = 0;
+        total_time_sec1 = 0.0;
+        total_time_sec2 = 0.0;
+        total_time_sec3a = 0.0;
+        total_time_sec3b = 0.0;
+        total_time_sec4 = 0.0;
+    }
 }
 
 cv::Mat Ten_occlusion_handing::update_debug_image(
@@ -186,11 +361,8 @@ cv::Mat Ten_occlusion_handing::update_debug_image(
 
     for (size_t i = 0; i < object_plum_2d_points_.size(); i++) {
         
-        if (i < 96 && i % 8 == 0){
-        cv::line(img, object_plum_2d_points_[i], object_plum_2d_points_[i + 1], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 1], object_plum_2d_points_[i + 2], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 2], object_plum_2d_points_[i + 3], cv::Scalar(0,255,0), 2, cv::LINE_AA);
-        cv::line(img, object_plum_2d_points_[i + 3], object_plum_2d_points_[i], cv::Scalar(0,255,0), 2, cv::LINE_AA);
+        if (i < 96){
+        cv::circle(img, object_plum_2d_points_[i],3, cv::Scalar(0,255,0), -1);
     }   
 }
 return img;
@@ -255,3 +427,4 @@ void Ten_occlusion_handing::set_debug_roi_image(
     Ten::init_3d_box _INIT_3D_BOX_;
 }       // namespace Ten
 #endif
+
