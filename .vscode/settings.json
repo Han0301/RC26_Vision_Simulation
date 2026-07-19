@@ -1,3 +1,4 @@
 {
-    "ROS2.distro": "noetic"
+    "ROS2.distro": "noetic",
+    "cmake.sourceDirectory": "/home/h/RC26_Vision_Simulation/src/3dto2d"
 }

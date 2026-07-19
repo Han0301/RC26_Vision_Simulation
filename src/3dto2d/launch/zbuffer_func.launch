@@ -1,8 +1,8 @@
 <launch>
-    <param name="save_root_path" value="/home/awwsome/datasets/juanZhou_gazebo20/" type="string"/>
-    <param name="map_file_path" value="$(find zwei)/map1_add/" type="string"/> 
-    <param name="txt_root_name" value="map_" type="string"/>
-    <param name="image_root_name" value="juanZhou_gazebo20" type="string"/>
-    <node pkg="3dto2d" type="zbuffer_func_node" name="zbuffer_func" output="screen"/>
+    <!-- auto_mode: true=自动遍历+录制数据集, false=仅感知处理 -->
+    <arg name="auto_mode" default="false" />
 
+    <node name="zbuffer_func_node" pkg="3dto2d" type="zbuffer_func_node" output="screen">
+        <param name="auto_mode" type="bool" value="$(arg auto_mode)" />
+    </node>
 </launch>

@@ -77,7 +77,7 @@ struct G
     std::vector<cv::Point2d> save_datasets_pos;     // 记录保存图像时点的位置， 以防止在同一个位置 重复拍摄
 }global;
 
-void zbuffer_process()
+void zbuffer_process(bool is_recording_dataset = false)
 {
     if (!global.pose_updated || !global.image_updated)
     {
@@ -120,45 +120,49 @@ void zbuffer_process()
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
-    static bool print_num = true;
-    if (print_num)
+    // 录制数据集部分
+    if (is_recording_dataset)
     {
-        print_num = false;
-        std::cout << "atoi(global.num.c_str()) : " << atoi(global.num.c_str()) << std::endl;
-    }
-
-    static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber(global.datasets_path + "/global_images");
-    
-    static Ten::XYZRPY last_tf;         // 上一帧的tf
-    static Ten::XYZRPY total_tf;        // 累积的tf差值
-    bool place_update = Ten::_OCCLUSION_HANDING_.is_pos_update(tf, last_tf, total_tf);      // 判断位置是否移动到一定程度
-    bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));     // 判断是否在同一个位置 重复拍摄
-
-    static int start_update = 0;        // 起始处等5帧， 防止保存空图像
-    if (place_update && tf_update && start_update > 5)
-    { 
-        static int save_count = 1;
-        bool is_update = true;      // set_box_lists_ 内部判断是否所有方块都在画面中
-        std::cout << "-------------------------------------------------------" << std::endl;
-        Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
-        Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_,is_update);
-        std::cout << "-------------------------------------------------------" << std::endl;
-        if (is_update)
+        static bool print_num = true;
+        if (print_num)
         {
-            global.save_datasets_pos.push_back(cv::Point2d(tf._xyz._x, tf._xyz._y));
-            Ten::_OCCLUSION_HANDING_.save_dataset(
-                Ten::_INIT_3D_BOX_.box_lists_,
-                global._image,
-                Ten::_OCCLUSION_HANDING_.processMapFile(global.workspace_path + "/src/zwei/map1_add/txt",atoi(global.num.c_str())),
-                global.datasets_path,
-                cccc.rvec(),
-                cccc.tvec(),
-                save_count_sta + save_count
-            );
-            save_count += 1;
+            print_num = false;
+            std::cout << "atoi(global.num.c_str()) : " << atoi(global.num.c_str()) << std::endl;
         }
+
+        static int save_count_sta = Ten::_OCCLUSION_HANDING_.getMaxImageNumber(global.datasets_path + "/global_images");
+        
+        static Ten::XYZRPY last_tf;         // 上一帧的tf
+        static Ten::XYZRPY total_tf;        // 累积的tf差值
+        bool place_update = Ten::_OCCLUSION_HANDING_.is_pos_update(tf, last_tf, total_tf);      // 判断位置是否移动到一定程度
+        bool tf_update = Ten::_OCCLUSION_HANDING_.checkPointDistance(global.save_datasets_pos,cv::Point2d(tf._xyz._x, tf._xyz._y));     // 判断是否在同一个位置 重复拍摄
+
+        static int start_update = 0;        // 起始处等5帧， 防止保存空图像
+        if (place_update && tf_update && start_update > 5)
+        { 
+            static int save_count = 1;
+            bool is_update = true;      // set_box_lists_ 内部判断是否所有方块都在画面中
+            std::cout << "-------------------------------------------------------" << std::endl;
+            Ten::_OCCLUSION_HANDING_.set_box_lists_(global._image,  Ten::_INIT_3D_BOX_.C_object_plum_points_, 
+            Ten::_INIT_3D_BOX_.object_plum_2d_points_ ,Ten::_INIT_3D_BOX_.box_lists_,is_update);
+            std::cout << "-------------------------------------------------------" << std::endl;
+            if (is_update)
+            {
+                global.save_datasets_pos.push_back(cv::Point2d(tf._xyz._x, tf._xyz._y));
+                Ten::_OCCLUSION_HANDING_.save_dataset(
+                    Ten::_INIT_3D_BOX_.box_lists_,
+                    global._image,
+                    Ten::_OCCLUSION_HANDING_.processMapFile(global.workspace_path + "/src/zwei/map1_add/txt",atoi(global.num.c_str())),
+                    global.datasets_path,
+                    cccc.rvec(),
+                    cccc.tvec(),
+                    save_count_sta + save_count
+                );
+                save_count += 1;
+            }
+        }
+        start_update += 1;
     }
-    start_update += 1;
 }
 
 // 回调函数1：处理/robot_pose话题
@@ -206,47 +210,81 @@ void worker_task2(ros::NodeHandle nh)
     }
 }
 
+void pub_color_image
+(
+    const cv::Mat& color_image,
+    const std::string topic_name = "/debug_images"
+)
+{
+    static ros::Publisher pub;
+    if (!pub)
+    {
+        ros::NodeHandle nh;
+        pub = nh.advertise<sensor_msgs::Image>(topic_name, 10);
+    }
+    if (color_image.empty() || color_image.channels() != 3) return;
+
+    cv_bridge::CvImage cv_msg;
+    cv_msg.header.stamp = ros::Time::now();
+    cv_msg.encoding = sensor_msgs::image_encodings::BGR8; // 固定彩色格式
+    cv_msg.image = color_image;
+    pub.publish(cv_msg.toImageMsg());
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "zbuffer_func_node");
-    ros::NodeHandle nh;
+    ros::NodeHandle nh("~");
 
-    BaseMoveController move_controller(nh);
-    if (!move_controller.start()) {
-        ROS_ERROR("Failed to start BaseMoveController. Shutting down.");
-        return 1;
+    // 读取 ROS 参数（从 launch 文件中配置）
+    bool auto_mode = false;
+    nh.param("auto_mode", auto_mode, false);
+
+    ROS_INFO("auto_mode: %s", auto_mode ? "true (运动+录制)" : "false (仅感知)");
+
+    ros::NodeHandle nh_public;
+
+    // 运动控制（auto_mode 时启用）
+    std::unique_ptr<BaseMoveController> move_controller;
+    if (auto_mode)
+    {
+        move_controller = std::make_unique<BaseMoveController>(nh_public);
+        if (!move_controller->start()) {
+            ROS_ERROR("Failed to start BaseMoveController. Shutting down.");
+            return 1;
+        }
+        ROS_INFO("BaseMoveController started successfully.");
     }
-    ROS_INFO("BaseMoveController started successfully.");
-    ros::Publisher cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+    else
+    {
+        ROS_INFO("Auto mode disabled — perception only.");
+    }
+
+    ros::Publisher cmd_vel_pub = nh_public.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
 
     std::vector<std::thread> workers;
     
-    workers.emplace_back(worker_task1, nh);
-    workers.emplace_back(worker_task2, nh);
+    workers.emplace_back(worker_task1, nh_public);
+    workers.emplace_back(worker_task2, nh_public);
 
-    image_transport::ImageTransport it(nh);
-    // image_transport::Publisher debug_image_pub = it.advertise("pub_image_topic", 2);
-    // image_transport::Publisher debug_roi_pub = it.advertise("/zbuffer_visualization", 30);
+    image_transport::ImageTransport it(nh_public);
 
-    ros::Rate rate(10);
+    ros::Rate rate(30);
     while(ros::ok())
     {
-        if (move_controller.isCompleted()) {
+        // auto_mode 下遍历完成则退出
+        if (auto_mode && move_controller->isCompleted()) {
             ros::shutdown();
             break;
         }
 
-        // sensor_msgs::ImagePtr msg;
-        // sensor_msgs::ImagePtr roi_msg;
-        // {
-        //     std::lock_guard<std::mutex> lock(global._mtx_image);
-        //     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_image).toImageMsg();
-        //     roi_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", global.debug_best_roi_image).toImageMsg();
-        // }
-        
-        // debug_image_pub.publish(msg);
-        // debug_roi_pub.publish(roi_msg);
-        zbuffer_process();
+        // 调试发布
+        {
+            std::lock_guard<std::mutex> lock(global._mtx_image);
+            pub_color_image(global.debug_image, "pub_image_topic");
+            pub_color_image(global.debug_best_roi_image, "/zbuffer_visualization");
+        }
+        zbuffer_process(auto_mode);
         rate.sleep();
     }
 
