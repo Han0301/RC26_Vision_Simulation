@@ -27,6 +27,7 @@
 #include <vector>
 #include <numeric>
 #include <unordered_set>
+#include <map>
 
 #include "package/method_math.h"
 #include "package/occlusion_handing.h"     
@@ -89,7 +90,7 @@ void zbuffer_process(bool is_recording_dataset = false)
     {
         std::lock_guard<std::mutex> lock(global.data_mutex);
         tf = Ten::Nav_Odometrytoxyzrpy(*global.robot_pose);
-        tf._xyz._z = tf._xyz._z - 0.05;
+        tf._xyz._z = tf._xyz._z + 0.05;
     }
 
     // 雷达到相机的固定变换
@@ -120,6 +121,13 @@ void zbuffer_process(bool is_recording_dataset = false)
     Ten::_OCCLUSION_HANDING_.set_exist_boxes(exist_boxes);
     Ten::_OCCLUSION_HANDING_.set_interested_boxes(interested_boxes);
 
+    global.debug_image = Ten::_OCCLUSION_HANDING_.update_debug_image(
+        global._image,
+        Ten::_INIT_3D_BOX_.object_plum_2d_points_
+    );
+
+    Ten::_OCCLUSION_HANDING_.set_debug_roi_image(Ten::_INIT_3D_BOX_.box_lists_,global.debug_best_roi_image);
+    
     // 录制数据集部分
     if (is_recording_dataset)
     {
@@ -216,19 +224,21 @@ void pub_color_image
     const std::string topic_name = "/debug_images"
 )
 {
-    static ros::Publisher pub;
-    if (!pub)
+    static std::map<std::string, ros::Publisher> pubs;
+    auto it = pubs.find(topic_name);
+    if (it == pubs.end())
     {
         ros::NodeHandle nh;
-        pub = nh.advertise<sensor_msgs::Image>(topic_name, 10);
+        it = pubs.emplace(topic_name,
+            nh.advertise<sensor_msgs::Image>(topic_name, 10)).first;
     }
     if (color_image.empty() || color_image.channels() != 3) return;
 
     cv_bridge::CvImage cv_msg;
     cv_msg.header.stamp = ros::Time::now();
-    cv_msg.encoding = sensor_msgs::image_encodings::BGR8; // 固定彩色格式
+    cv_msg.encoding = sensor_msgs::image_encodings::BGR8;
     cv_msg.image = color_image;
-    pub.publish(cv_msg.toImageMsg());
+    it->second.publish(cv_msg.toImageMsg());
 }
 
 int main(int argc, char **argv)
@@ -278,13 +288,14 @@ int main(int argc, char **argv)
             break;
         }
 
-        // 调试发布
+        zbuffer_process(auto_mode);
+
+        // 调试发布（在 zbuffer_process 之后，确保图像已更新）
         {
             std::lock_guard<std::mutex> lock(global._mtx_image);
             pub_color_image(global.debug_image, "pub_image_topic");
             pub_color_image(global.debug_best_roi_image, "/zbuffer_visualization");
         }
-        zbuffer_process(auto_mode);
         rate.sleep();
     }
 
